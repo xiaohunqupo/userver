@@ -8,6 +8,7 @@ userver_module(redis
     DBTEST_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/*_redistest.cpp"
     DBTEST_DATABASES redis redis-cluster
     UBENCH_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/benchmark"
+    UBENCH_DATABASES redis
 )
 
 # for libev
