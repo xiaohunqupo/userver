@@ -485,6 +485,8 @@ function(userver_add_utest)
   if(ARG_DATABASES)
     list(JOIN ARG_DATABASES "," databases_value)
     list(APPEND additional_args "--databases=${databases_value}")
+  else()
+    list(APPEND additional_args "--databases=")
   endif()
 
   if(NOT ARG_DISABLE_GTEST_XML_OUTPUT)
