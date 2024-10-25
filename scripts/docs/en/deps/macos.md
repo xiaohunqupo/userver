@@ -16,6 +16,7 @@ krb5
 nghttp2
 ninja
 protobuf
+pugixml
 openssl
 yaml-cpp
 librdkafka
