@@ -1157,6 +1157,7 @@
   "core/src/engine/coro/pool_stats.hpp":"taxi/uservices/userver/core/src/engine/coro/pool_stats.hpp",
   "core/src/engine/coro/stack_usage_monitor.cpp":"taxi/uservices/userver/core/src/engine/coro/stack_usage_monitor.cpp",
   "core/src/engine/coro/stack_usage_monitor.hpp":"taxi/uservices/userver/core/src/engine/coro/stack_usage_monitor.hpp",
+  "core/src/engine/coro/stack_usage_monitor_benchmark.cpp":"taxi/uservices/userver/core/src/engine/coro/stack_usage_monitor_benchmark.cpp",
   "core/src/engine/coro/stack_usage_monitor_test.cpp":"taxi/uservices/userver/core/src/engine/coro/stack_usage_monitor_test.cpp",
   "core/src/engine/deadline.cpp":"taxi/uservices/userver/core/src/engine/deadline.cpp",
   "core/src/engine/deadline_benchmark.cpp":"taxi/uservices/userver/core/src/engine/deadline_benchmark.cpp",
