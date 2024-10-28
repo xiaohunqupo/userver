@@ -120,6 +120,12 @@ class UserverConan(ConanFile):
 
         if self.options.with_jemalloc:
             self.requires('jemalloc/5.3.0')
+        if self.options.with_grpc or self.options.with_clickhouse:
+            self.requires(
+                'abseil/20230125.3',
+                transitive_headers=True,
+                transitive_libs=True,
+            )
         if self.options.with_grpc:
             self.requires(
                 'grpc/1.48.4', transitive_headers=True, transitive_libs=True,
@@ -151,11 +157,6 @@ class UserverConan(ConanFile):
             self.requires('amqp-cpp/4.3.16')
         if self.options.with_clickhouse:
             self.requires('clickhouse-cpp/2.4.0')
-            self.requires(
-                'abseil/20230125.3',
-                transitive_headers=True,
-                transitive_libs=True,
-            )
         if self.options.with_utest:
             self.requires(
                 'gtest/1.12.1', transitive_headers=True, transitive_libs=True,
