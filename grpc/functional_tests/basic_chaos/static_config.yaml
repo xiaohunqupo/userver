@@ -39,10 +39,10 @@ components_manager:
             # Nothing
 # /// [Sample grpc server congestion control middleware component config]
 
-# /// [Sample grpc server field-mask-bin middleware component config]
-        grpc-server-field-mask-bin:
-            metadata-field-name: field-mask-bin
-# /// [Sample grpc server field-mask-bin middleware component config]
+# /// [Sample grpc server field-mask middleware component config]
+        grpc-server-field-mask:
+            metadata-field-name: field-mask
+# /// [Sample grpc server field-mask middleware component config]
         greeter-service:
             greeting-prefix: Hello
 
