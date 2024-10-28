@@ -265,3 +265,5 @@ endif()
 if(USERVER_INSTALL)
   include(cmake/UserverPack.cmake)
 endif()
+
+_userver_print_features_list()
