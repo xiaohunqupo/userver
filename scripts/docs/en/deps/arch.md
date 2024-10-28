@@ -25,6 +25,7 @@ python-jinja
 python-pip
 python-voluptuous
 python-yaml
+rocksdb
 yaml-cpp
 zlib
 makepkg|cctz
