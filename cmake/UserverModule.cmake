@@ -2,7 +2,7 @@ include_guard(GLOBAL)
 
 function(userver_module MODULE)
   unset(ARG_UNPARSED_ARGUMENTS)
-  set(OPTIONS)
+  set(OPTIONS NO_INSTALL)
   set(ONE_VALUE_ARGS SOURCE_DIR)
   set(MULTI_VALUE_ARGS
       IGNORE_SOURCES
@@ -84,17 +84,25 @@ function(userver_module MODULE)
       ${ARG_LINK_LIBRARIES_PRIVATE}
   )
 
-  _userver_directory_install(
-      COMPONENT ${MODULE}
-      DIRECTORY "${ARG_SOURCE_DIR}/include"
-      DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/.."
-  )
-  _userver_install_targets(COMPONENT ${MODULE} TARGETS userver-${MODULE})
-  _userver_directory_install(
-      COMPONENT ${MODULE}
-      FILES "${USERVER_ROOT_DIR}/cmake/install/userver-${MODULE}-config.cmake"
-      DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/userver"
-  )
+  if(NOT ARG_NO_INSTALL)
+    _userver_directory_install(
+        COMPONENT ${MODULE}
+        DIRECTORY "${ARG_SOURCE_DIR}/include"
+        DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/.."
+    )
+    _userver_install_targets(COMPONENT ${MODULE} TARGETS userver-${MODULE})
+
+        set(install_config_file "${USERVER_ROOT_DIR}/cmake/install/userver-${MODULE}-config.cmake")
+
+        if(NOT EXISTS ${install_config_file})
+            message(FATAL_ERROR "Can not install ${MODULE}, no installation config in ${install_config_file}")
+        endif()
+    _userver_directory_install(
+        COMPONENT ${MODULE}
+        FILES "${install_config_file}"
+        DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/userver"
+    )
+  endif()
 
   ## 2. userver-${MODULE}-unittest
   if(USERVER_IS_THE_ROOT_PROJECT AND UTEST_SOURCES)

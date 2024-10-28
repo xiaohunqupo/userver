@@ -3,6 +3,7 @@ project(userver-rocks CXX)
 include(SetupRocksDB)
 
 userver_module(rocks
+    NO_INSTALL
     SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}"
     LINK_LIBRARIES rocksdb
     UTEST_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/*_test.cpp"
