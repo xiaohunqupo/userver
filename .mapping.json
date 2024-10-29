@@ -1295,6 +1295,7 @@
   "core/src/engine/task/sleep_state.hpp":"taxi/uservices/userver/core/src/engine/task/sleep_state.hpp",
   "core/src/engine/task/task.cpp":"taxi/uservices/userver/core/src/engine/task/task.cpp",
   "core/src/engine/task/task_base.cpp":"taxi/uservices/userver/core/src/engine/task/task_base.cpp",
+  "core/src/engine/task/task_base_impl.hpp":"taxi/uservices/userver/core/src/engine/task/task_base_impl.hpp",
   "core/src/engine/task/task_benchmark.cpp":"taxi/uservices/userver/core/src/engine/task/task_benchmark.cpp",
   "core/src/engine/task/task_context.cpp":"taxi/uservices/userver/core/src/engine/task/task_context.cpp",
   "core/src/engine/task/task_context.hpp":"taxi/uservices/userver/core/src/engine/task/task_context.hpp",
