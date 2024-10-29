@@ -41,6 +41,7 @@ int main(int argc, char* argv[]) {
                                     .Append<congestion_control::Component>()
                                     .Append<samples::GreeterServiceComponent>()
                                     .Append<samples::GreeterClient>()
+                                    .Append<samples::GreeterClientComponent>("greeter-client-component")
                                     .Append<samples::GreeterHttpHandler>();
     return utils::DaemonMain(argc, argv, component_list);
 }

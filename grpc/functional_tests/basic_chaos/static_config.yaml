@@ -57,6 +57,14 @@ components_manager:
         greeter-client:
             endpoint: '[::]:8081'
 
+        greeter-client-component:
+            endpoint: '[::]:8081'
+            client-name: greeter-client
+            dedicated-channel-counts:
+                SayHello: 3
+                SayHelloRequestStream: 2
+            factory-component: grpc-client-factory
+
         # http server
         server:
             listener:
