@@ -32,7 +32,7 @@ bool TaskBase::IsValid() const { return !!pimpl_->context; }
 
 Task::State TaskBase::GetState() const { return pimpl_->context ? pimpl_->context->GetState() : State::kInvalid; }
 
-const std::string& TaskBase::GetStateName(State state) {
+std::string_view TaskBase::GetStateName(State state) {
     static const std::string kInvalid = "kInvalid";
     static const std::string kNew = "kNew";
     static const std::string kQueued = "kQueued";

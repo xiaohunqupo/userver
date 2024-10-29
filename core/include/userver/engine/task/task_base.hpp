@@ -5,7 +5,7 @@
 
 #include <chrono>
 #include <memory>
-#include <string>
+#include <string_view>
 
 #include <userver/engine/deadline.hpp>
 #include <userver/engine/task/cancel.hpp>
@@ -79,7 +79,7 @@ public:
     /// Gets the task State
     State GetState() const;
 
-    static const std::string& GetStateName(State state);
+    static std::string_view GetStateName(State state);
 
     /// Returns whether the task finished execution
     bool IsFinished() const;

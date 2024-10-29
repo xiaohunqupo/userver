@@ -3907,6 +3907,7 @@
   "universal/include/userver/utils/any_storage.hpp":"taxi/uservices/userver/universal/include/userver/utils/any_storage.hpp",
   "universal/include/userver/utils/assert.hpp":"taxi/uservices/userver/universal/include/userver/utils/assert.hpp",
   "universal/include/userver/utils/atomic.hpp":"taxi/uservices/userver/universal/include/userver/utils/atomic.hpp",
+  "universal/include/userver/utils/boost_filesystem_file_status.hpp":"taxi/uservices/userver/universal/include/userver/utils/boost_filesystem_file_status.hpp",
   "universal/include/userver/utils/boost_uuid4.hpp":"taxi/uservices/userver/universal/include/userver/utils/boost_uuid4.hpp",
   "universal/include/userver/utils/boost_uuid7.hpp":"taxi/uservices/userver/universal/include/userver/utils/boost_uuid7.hpp",
   "universal/include/userver/utils/box.hpp":"taxi/uservices/userver/universal/include/userver/utils/box.hpp",

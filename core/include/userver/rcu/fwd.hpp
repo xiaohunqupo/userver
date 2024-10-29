@@ -3,10 +3,6 @@
 /// @file userver/rcu/fwd.hpp
 /// @brief Forward declarations for rcu::Variable and rcu::RcuMap
 
-// TODO remove extra includes
-#include <functional>
-#include <unordered_map>
-
 USERVER_NAMESPACE_BEGIN
 
 namespace rcu {
