@@ -67,7 +67,7 @@ public:
 class FieldMaskTest : public ugrpc::tests::ServiceFixtureBase {
 protected:
     FieldMaskTest() {
-        auto field_mask_middleware = std::make_shared<ugrpc::server::middlewares::field_mask::Middleware>("field-mask");
+        auto field_mask_middleware = std::make_shared<ugrpc::server::middlewares::field_mask::Middleware>("Field-Mask");
         SetServerMiddlewares({field_mask_middleware});
         RegisterService(service_);
         StartServer();

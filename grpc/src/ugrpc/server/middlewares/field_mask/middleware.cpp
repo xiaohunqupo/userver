@@ -1,7 +1,6 @@
 #include "middleware.hpp"
 
 #include <string_view>
-#include <utility>
 
 #include <google/protobuf/field_mask.pb.h>
 #include <google/protobuf/util/field_mask_util.h>
@@ -11,6 +10,7 @@
 #include <userver/ugrpc/field_mask.hpp>
 #include <userver/ugrpc/server/metadata_utils.hpp>
 #include <userver/ugrpc/server/middlewares/field_mask/component.hpp>
+#include <userver/utils/text.hpp>
 
 USERVER_NAMESPACE_BEGIN
 
@@ -26,7 +26,8 @@ FieldMask ConstructFieldMask(ugrpc::server::CallAnyBase& call, std::string_view 
 
 }  // namespace
 
-Middleware::Middleware(std::string metadata_field_name) : metadata_field_name_(std::move(metadata_field_name)) {}
+Middleware::Middleware(std::string metadata_field_name)
+    : metadata_field_name_(utils::text::ToLower(metadata_field_name)) {}
 
 void Middleware::Handle(ugrpc::server::MiddlewareCallContext& context) const {
     try {
@@ -48,7 +49,7 @@ void Middleware::CallResponseHook(
     try {
         field_mask.Trim(response);
     } catch (const FieldMask::BadPathError& e) {
-        LOG_WARNING() << "Failed to trim the response " << e.what();
+        LOG_WARNING() << "Failed to trim the response: " << e.what();
         context.GetCall().FinishWithError(::grpc::Status(::grpc::StatusCode::INVALID_ARGUMENT, e.what()));
     }
 }
