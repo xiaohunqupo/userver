@@ -9,8 +9,7 @@
 
 USERVER_NAMESPACE_BEGIN
 
-namespace s3api {
-namespace api_methods {
+namespace s3api::api_methods {
 
 Request PutObject(
     std::string_view bucket,
@@ -117,8 +116,6 @@ Request CopyObject(
     return req;
 }
 
-}  // namespace api_methods
-
-}  // namespace s3api
+}  // namespace s3api::api_methods
 
 USERVER_NAMESPACE_END

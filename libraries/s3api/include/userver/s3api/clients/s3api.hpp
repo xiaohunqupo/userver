@@ -101,6 +101,8 @@ public:
 
     virtual ~Client() = default;
 
+    // NOLINTBEGIN(google-default-arguments)
+
     virtual std::string PutObject(
         std::string_view path,
         std::string data,
@@ -166,11 +168,11 @@ public:
 
     virtual std::vector<std::string> ListBucketDirectories(std::string_view path_prefix) const = 0;
 
-    // TODO: See if we can get rid of it
-    // TODO: Or rename it as UpdateConnectionConfig
     virtual void UpdateConfig(ConnectionCfg&& config) = 0;
 
     virtual std::string_view GetBucketName() const = 0;
+
+    // NOLINTEND(google-default-arguments)
 };
 
 using ClientPtr = std::shared_ptr<Client>;
