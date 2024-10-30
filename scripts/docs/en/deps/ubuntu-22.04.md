@@ -34,7 +34,6 @@ libjemalloc-dev
 libkrb5-dev
 libldap2-dev
 librdkafka-dev
-librocksdb-dev
 liblz4-dev
 libmariadb-dev
 libmongoc-dev
