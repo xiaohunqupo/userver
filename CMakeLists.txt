@@ -255,6 +255,8 @@ if (USERVER_FEATURE_YDB)
   list(APPEND USERVER_AVAILABLE_COMPONENTS ydb)
 endif()
 
+add_subdirectory(libraries)
+
 _userver_export_targets()
 _userver_make_install_config()
 
