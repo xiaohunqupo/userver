@@ -30,6 +30,7 @@ librocksdb-dev
 libmongoc-dev
 libnghttp2-dev
 libpq-dev
+libpugixml-dev
 libprotoc-dev
 libssl-dev
 libsasl2-dev

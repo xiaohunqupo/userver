@@ -19,6 +19,7 @@ ninja
 openssl
 postgresql
 postgresql-libs
+pugixml
 python
 python-google-api-python-client
 python-jinja
