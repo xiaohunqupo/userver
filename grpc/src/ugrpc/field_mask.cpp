@@ -375,8 +375,12 @@ utils::OptionalRef<const FieldMask> FieldMask::GetMaskForField(std::string_view 
         static const FieldMask kEmptyFieldMask;
         return kEmptyFieldMask;
     }
-    const auto it = utils::impl::FindTransparent(*children_, field);
-    if (it == children_->end()) return std::nullopt;
+    auto it = utils::impl::FindTransparent(*children_, field);
+    if (it == children_->end()) {
+        // '*' applies to all fields if there is no more specific rule
+        it = children_->find("*");
+        if (it == children_->end()) return std::nullopt;
+    }
     return it->second;
 }
 

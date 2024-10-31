@@ -1013,6 +1013,13 @@ TEST(FieldMaskGetMaskForField, NonExistingChildOnLeaf) {
     EXPECT_EQ(&mask.GetMaskForField("something-weird").value(), &mask.GetMaskForField("something-weird-2").value());
 }
 
+TEST(FieldMaskGetMaskForField, FallbackToWildcard) {
+    const ugrpc::FieldMask mask(MakeGoogleFieldMask(kHardFieldMask));
+    const utils::OptionalRef<const ugrpc::FieldMask> nested_map = mask.GetMaskForField("nested_map");
+    const utils::OptionalRef<const ugrpc::FieldMask> unknown_key = nested_map->GetMaskForField("unknown_key");
+    EXPECT_THAT(unknown_key->GetFieldNames(), testing::UnorderedElementsAreArray({"optional_string"}));
+}
+
 TEST(FieldMaskHasFieldName, MockFieldMask) {
     ugrpc::FieldMask mask(MakeGoogleFieldMask(kMockFieldMask));
     EXPECT_FALSE(mask.HasFieldName("something-weird"));
