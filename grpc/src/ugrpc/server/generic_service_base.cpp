@@ -21,7 +21,7 @@ GenericServiceBase::Handle(GenericCallContext& /*context*/, GenericReaderWriter&
 void GenericServiceBase::Handle(Call& call) {
     GenericCallContext context{call};
     auto result = Handle(context, call);
-    impl::Finish(call, std::move(result));
+    impl::Finalize(call, std::move(result));
 }
 
 }  // namespace ugrpc::server

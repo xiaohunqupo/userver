@@ -44,7 +44,7 @@ inline const bool k{{service.name}}TypesRegistration =
 void {{service.name}}Base::{{method.name}}({{method.name}}Call& call) {
   CallContext context{call};
   auto result = {{method.name}}(context, call);
-  USERVER_NAMESPACE::ugrpc::server::impl::Finish(call, std::move(result));
+  USERVER_NAMESPACE::ugrpc::server::impl::Finalize(call, std::move(result));
 }
 
 {% elif method.client_streaming %}
@@ -60,7 +60,7 @@ void {{service.name}}Base::{{method.name}}({{method.name}}Call& call) {
 void {{service.name}}Base::{{method.name}}({{method.name}}Call& call) {
   CallContext context{call};
   auto result = {{method.name}}(context, call);
-  USERVER_NAMESPACE::ugrpc::server::impl::Finish(call, std::move(result));
+  USERVER_NAMESPACE::ugrpc::server::impl::Finalize(call, std::move(result));
 }
 
 {% elif method.server_streaming %}
@@ -78,7 +78,7 @@ void {{service.name}}Base::{{method.name}}({{method.name}}Call& call,
                                            {{ method.input_type | grpc_to_cpp_name }}&& request) {
   CallContext context{call};
   auto result = {{method.name}}(context, std::move(request), call);
-  USERVER_NAMESPACE::ugrpc::server::impl::Finish(call, std::move(result));
+  USERVER_NAMESPACE::ugrpc::server::impl::Finalize(call, std::move(result));
 }
 
 {% else %}
@@ -95,7 +95,7 @@ void {{service.name}}Base::{{method.name}}({{method.name}}Call& call,
                                            {{ method.input_type | grpc_to_cpp_name }}&& request) {
   CallContext context{call};
   auto result = {{method.name}}(context, std::move(request));
-  USERVER_NAMESPACE::ugrpc::server::impl::Finish(call, std::move(result));
+  USERVER_NAMESPACE::ugrpc::server::impl::Finalize(call, std::move(result));
 }
 
 {% endif %}
