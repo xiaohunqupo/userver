@@ -127,7 +127,7 @@ jobs:
           - name: Install clang-format
             if: matrix.os == 'ubuntu-20.04'
             run: |
-                sudo add-apt-repository ppa:ubuntu-toolchain-r/test
+                sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
                 sudo apt update
                 wget https://apt.llvm.org/llvm.sh
                 chmod +x llvm.sh
