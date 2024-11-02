@@ -28,15 +28,16 @@ namespace {
 #define DISABLE_IF_OLD_PROTOBUF_TEST(test_suite, name) TEST(test_suite, DISABLED_##name)
 #endif
 
-const std::vector<std::string> kSmallFieldMask = {"abc.`def.gh`.qc gh", "value.field"};
+// The weird characters are important to test whether WebSafeBase64 actually works.
+const std::vector<std::string> kSmallFieldMask = {"abc.`def.gh`.qc gh+ûï¾", "value.field"};
 
 // These should be equivalent. Depends on the order of paths in the mask.
-const std::string kSmallFieldMaskCommaSeparatedString1 = "abc.`def.gh`.qc gh,value.field";
-const std::string kSmallFieldMaskCommaSeparatedString2 = "value.field,abc.`def.gh`.qc gh";
+const std::string kSmallFieldMaskCommaSeparatedString1 = "abc.`def.gh`.qc gh+ûï¾,value.field";
+const std::string kSmallFieldMaskCommaSeparatedString2 = "value.field,abc.`def.gh`.qc gh+ûï¾";
 
 // These should be equivalent. Depends on the order of paths in the mask.
-const std::string kSmallFieldMaskWebSafeBase64String1 = "YWJjLmBkZWYuZ2hgLnFjIGdoLHZhbHVlLmZpZWxk";
-const std::string kSmallFieldMaskWebSafeBase64String2 = "dmFsdWUuZmllbGQsYWJjLmBkZWYuZ2hgLnFjIGdo";
+const std::string kSmallFieldMaskWebSafeBase64String1 = "YWJjLmBkZWYuZ2hgLnFjIGdoK8O7w6_Cvix2YWx1ZS5maWVsZA==";
+const std::string kSmallFieldMaskWebSafeBase64String2 = "dmFsdWUuZmllbGQsYWJjLmBkZWYuZ2hgLnFjIGdoK8O7w6_Cvg==";
 
 void EnsureEqualToSmallMask(const ugrpc::FieldMask& field_mask) {
     EXPECT_FALSE(field_mask.IsLeaf());
@@ -48,9 +49,9 @@ void EnsureEqualToSmallMask(const ugrpc::FieldMask& field_mask) {
 
     const ugrpc::FieldMask& defgh = abc.GetMaskForField("def.gh").value();
     EXPECT_FALSE(defgh.IsLeaf());
-    EXPECT_THAT(defgh.GetFieldNames(), testing::UnorderedElementsAreArray({"qc gh"}));
+    EXPECT_THAT(defgh.GetFieldNames(), testing::UnorderedElementsAreArray({"qc gh+ûï¾"}));
 
-    const ugrpc::FieldMask& qcgh = defgh.GetMaskForField("qc gh").value();
+    const ugrpc::FieldMask& qcgh = defgh.GetMaskForField("qc gh+ûï¾").value();
     EXPECT_TRUE(qcgh.IsLeaf());
     EXPECT_THAT(qcgh.GetFieldNamesList(), testing::IsEmpty());
 

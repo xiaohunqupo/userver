@@ -13,11 +13,11 @@
 #include <google/protobuf/reflection.h>
 #include <google/protobuf/stubs/common.h>
 #include <google/protobuf/stubs/port.h>
-#include <google/protobuf/stubs/strutil.h>
 #include <google/protobuf/util/field_mask_util.h>
 #include <grpcpp/support/config.h>
 
 #include <ugrpc/impl/protobuf_utils.hpp>
+#include <userver/crypto/base64.hpp>
 #include <userver/ugrpc/protobuf_visit.hpp>
 #include <userver/utils/assert.hpp>
 #include <userver/utils/text_light.hpp>
@@ -91,14 +91,10 @@ std::string GetMapKeyAsString(const google::protobuf::Message& entry) {
 
 google::protobuf::FieldMask RawFromString(std::string_view string, FieldMask::Encoding encoding) {
     google::protobuf::FieldMask out;
-    ::grpc::string base64_tmp;
+    std::string base64_tmp;
     switch (encoding) {
         case FieldMask::Encoding::kWebSafeBase64:
-#if GOOGLE_PROTOBUF_VERSION >= 3018000
-            google::protobuf::WebSafeBase64Unescape(string, &base64_tmp);
-#else
-            google::protobuf::WebSafeBase64Unescape(::grpc::string(string), &base64_tmp);
-#endif
+            base64_tmp = crypto::base64::Base64UrlDecode(string);
             string = base64_tmp;
             [[fallthrough]];
         case FieldMask::Encoding::kCommaSeparated:
@@ -118,10 +114,7 @@ std::string RawToString(const google::protobuf::FieldMask& field_mask, FieldMask
     auto comma_separated = google::protobuf::util::FieldMaskUtil::ToString(field_mask);
     if (encoding == FieldMask::Encoding::kCommaSeparated) return comma_separated;
     UINVARIANT(encoding == FieldMask::Encoding::kWebSafeBase64, "Unknown encoding");
-
-    ::grpc::string base64_encoded;
-    google::protobuf::WebSafeBase64Escape(comma_separated, &base64_encoded);
-    return base64_encoded;
+    return crypto::base64::Base64UrlEncode(comma_separated, crypto::base64::Pad::kWith);
 }
 
 }  // namespace
