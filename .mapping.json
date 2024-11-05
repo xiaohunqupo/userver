@@ -3527,6 +3527,7 @@
   "testsuite/pytest_plugins/pytest_userver/plugins/postgresql.py":"taxi/uservices/userver/testsuite/pytest_plugins/pytest_userver/plugins/postgresql.py",
   "testsuite/pytest_plugins/pytest_userver/plugins/rabbitmq.py":"taxi/uservices/userver/testsuite/pytest_plugins/pytest_userver/plugins/rabbitmq.py",
   "testsuite/pytest_plugins/pytest_userver/plugins/redis.py":"taxi/uservices/userver/testsuite/pytest_plugins/pytest_userver/plugins/redis.py",
+  "testsuite/pytest_plugins/pytest_userver/plugins/s3api.py":"taxi/uservices/userver/testsuite/pytest_plugins/pytest_userver/plugins/s3api.py",
   "testsuite/pytest_plugins/pytest_userver/plugins/service.py":"taxi/uservices/userver/testsuite/pytest_plugins/pytest_userver/plugins/service.py",
   "testsuite/pytest_plugins/pytest_userver/plugins/service_client.py":"taxi/uservices/userver/testsuite/pytest_plugins/pytest_userver/plugins/service_client.py",
   "testsuite/pytest_plugins/pytest_userver/plugins/service_runner.py":"taxi/uservices/userver/testsuite/pytest_plugins/pytest_userver/plugins/service_runner.py",
