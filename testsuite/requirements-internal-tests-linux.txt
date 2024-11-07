@@ -1,2 +1,1 @@
 netifaces >= 0.10.0
-grpcio-reflection
