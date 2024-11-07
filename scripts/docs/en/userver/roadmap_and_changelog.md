@@ -37,6 +37,9 @@ Changelog news also go to the
 
 * Added S3 API client s3api::Client. More docs to come soon. Many thanks to
   [v-for-vandal](https://github.com/v-for-vandal) for the work!
+* Added gRPC reflection library. More docs to come soon. Many thanks to
+  [v-for-vandal](https://github.com/v-for-vandal) for the work!
+* @ref scripts/docs/en/userver/congestion_control.md "Congestion Control" turned on by default.
 * Initial work towards embedding GDB pretty-printers to userver binaries.
 * Mongo now has the full functionality for diagnostics out-of-the box, without mongo-c library patches.
 * Simplified contributing by removing the annoying bot that checks for explicit agreement to CLA. Creating an issue or
@@ -62,7 +65,8 @@ Optimizations:
 
 * Build:
   * Added `userver_module()` CMake function to simplify configuration of new drivers that are being added to userver.
-  * Added missing `fmt/ranges.h` includes. Thanks to [Vasilii Kuziakin](https://github.com/Basiliuss) for the PR!
+  * Added missing `fmt/ranges.h` includes. Thanks to [Vasilii Kuziakin](https://github.com/Basiliuss) and to
+    [SidorovichPavel](https://github.com/SidorovichPavel) for the PRs!
   * Proper use of `PROTOBUF_PROTOC` in CMake. Thanks to [Nikita](https://github.com/rtkid-nik) for the PR!
   * Added support for builds in paths that contain whitespaces and other special symbols.
   * Added CI build tests for Ubuntu 24.04 and MacOS.
