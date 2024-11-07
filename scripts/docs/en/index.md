@@ -154,6 +154,8 @@ are available at the
 ### S3 client
 * @ref scripts/docs/en/userver/libraries/s3api.md
 
+### grpc-reflection
+* @ref scripts/docs/en/userver/libraries/grpc-reflection.md
 
 ## Opensource
 * @ref scripts/docs/en/userver/development/stability.md
