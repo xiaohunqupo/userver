@@ -11,6 +11,11 @@ components_manager:
             method: GET
             task_processor: main-task-processor
 
+        handler-ping:
+            path: /ping
+            method: GET
+            task_processor: main-task-processor
+
         handler-on-log-rotate:
             path: /service/on-log-rotate/
             method: POST
