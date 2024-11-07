@@ -432,7 +432,10 @@ definitions:
                 example: '2018-08-24T18:36:00.15Z'
             removed:
                 type: array
-                description: Configs not found
+                description: | 
+                    Configs that were removed from the last update.
+                    Should be returned only by testsuite mocks, but not by real config services.
+                    Used only in case of incremental updates, i.e. updated_since is present.
                 items:
                     type: string
                     description: Config id
