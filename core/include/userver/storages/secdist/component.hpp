@@ -57,6 +57,9 @@ private:
 template <>
 inline constexpr bool kHasValidate<Secdist> = true;
 
+template <>
+inline constexpr auto kConfigFileMode<Secdist> = ConfigFileMode::kNotRequired;
+
 }  // namespace components
 
 USERVER_NAMESPACE_END
