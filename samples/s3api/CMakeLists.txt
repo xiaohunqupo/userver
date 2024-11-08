@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.14)
 project(userver-samples-s3api CXX)
 
 # /// [s3api]
+# cmake
 find_package(userver COMPONENTS core s3api REQUIRED)
 
 add_library(${PROJECT_NAME}_objs OBJECT
@@ -15,6 +16,7 @@ add_executable(${PROJECT_NAME} main.cpp)
 target_link_libraries(${PROJECT_NAME} ${PROJECT_NAME}_objs)
 
 # /// [gtest]
+# cmake
 add_executable(${PROJECT_NAME}-unittest unittests/client_test.cpp)
 target_link_libraries(${PROJECT_NAME}-unittest
     ${PROJECT_NAME}_objs

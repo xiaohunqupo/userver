@@ -12,13 +12,13 @@ replace all standard primitives with userver ones.
 To be honest, usage is exceedingly simple:
 
 1. Link with in your CMakeLists.txt
-```
+```cmake
 find_package(userver COMPONENTS grpc grpc-reflection REQUIRED)
 target_link_libraries(${PROJECT_NAME} userver::grpc-reflection)
 ```
 
 2. Add component to your service
-```
+```cpp
 #include <userver/grpc-reflection/reflection_service_component.hpp>
 
 
@@ -28,11 +28,12 @@ int main(int argc, char* argv[]) {
                                     .Append<grpc_reflection::ReflectionServiceComponent>()
                                     ....
 }
-....
+```
 
 3. Add simple line to your config.yaml
    Don't forget that grpc-reflection requires grpc
 ```
+yaml
 components_manager:
     components:
         grpc-reflection-service:

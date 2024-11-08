@@ -35,10 +35,12 @@ Changelog news also go to the
 
 ### Release v2.5
 
-* Added S3 API client s3api::Client. More docs to come soon. Many thanks to
+* Added @ref scripts/docs/en/userver/libraries/s3api.md "S3 API client s3api::Client". Many thanks to
   [v-for-vandal](https://github.com/v-for-vandal) for the work!
-* Added gRPC reflection library. More docs to come soon. Many thanks to
+* Added @ref scripts/docs/en/userver/libraries/grpc-reflection.md "gRPC reflection library". Many thanks to
   [v-for-vandal](https://github.com/v-for-vandal) for the work!
+* Added @ref kill_switches "Kill Switch" functionality. Many thanks to
+  [Aksenov Anton](https://github.com/Dangerio) for the work!
 * @ref scripts/docs/en/userver/congestion_control.md "Congestion Control" turned on by default.
 * Initial work towards embedding GDB pretty-printers to userver binaries.
 * Mongo now has the full functionality for diagnostics out-of-the box, without mongo-c library patches.

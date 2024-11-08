@@ -35,7 +35,9 @@ Here is usage example
 ## Testing
 
 We provide google mock for client, that you can access by including header
-```#include <userver/s3api/utest/client_gmock.hpp>```
+```cpp
+#include <userver/s3api/utest/client_gmock.hpp>
+```
 
 With this mock, you have full power of Google Mock at your fingertips:
 
@@ -48,7 +50,7 @@ To add tests to your project, add appropriate lines to CMakeLists.txt, like this
 
 ## Testsuite support
 
-Testsuite module is provided as part of testsuite plugins and can be found here:
+Testsuite module is provided as part of testsuite plugins and can be found at:
 
 @ref testsuite/pytest_plugins/pytest_userver/plugins/s3api.py
 
@@ -66,8 +68,14 @@ See the full example at:
 
 ----------
 
+@htmlonly <div class="bottom-nav"> @endhtmlonly
+⇦ @ref scripts/docs/en/userver/tutorial/multipart_service.md | @ref scripts/docs/en/userver/tutorial/json_to_yaml.md ⇨
+@htmlonly </div> @endhtmlonly
+
 @example samples/s3api/src/s3api_client.hpp
 @example samples/s3api/src/s3api_client.cpp
 @example samples/s3api/unittests/client_test.cpp
 @example samples/s3api/main.cpp
 @example samples/s3api/CMakeLists.txt
+
+@example testsuite/pytest_plugins/pytest_userver/plugins/s3api.py
