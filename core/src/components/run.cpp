@@ -72,8 +72,6 @@ private:
     logging::DefaultLoggerLevelScope level_scope_;
 };
 
-const utils::impl::UserverExperiment kJemallocBgThread{"jemalloc-bg-thread"};
-
 void HandleJemallocSettings() {
     static constexpr size_t kDefaultMaxBgThreads = 1;
 
@@ -82,7 +80,7 @@ void HandleJemallocSettings() {
         LOG_WARNING() << "Failed to set max_background_threads to " << kDefaultMaxBgThreads;
     }
 
-    if (kJemallocBgThread.IsEnabled()) {
+    if (utils::impl::kJemallocBgThread.IsEnabled()) {
         utils::jemalloc::EnableBgThreads();
     }
 }
@@ -201,7 +199,7 @@ void DoRun(
     std::optional<Manager> manager;
 
     try {
-        experiments_scope.EnableOnly(manager_config.enabled_experiments, manager_config.experiments_force_enabled);
+        experiments_scope.EnableOnly(manager_config.enabled_experiments);
 
         HandleJemallocSettings();
         if (manager_config.preheat_stacktrace_collector) {

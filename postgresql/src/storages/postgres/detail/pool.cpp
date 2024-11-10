@@ -22,8 +22,6 @@ namespace storages::postgres::detail {
 
 namespace {
 
-USERVER_NAMESPACE::utils::impl::UserverExperiment kCcExperiment("pg-cc");
-
 constexpr std::chrono::seconds kRecentErrorPeriod{15};
 
 // Part of max_pool that can be cancelled at once
@@ -114,7 +112,7 @@ ConnectionPool::ConnectionPool(
           config_source,
           [](const dynamic_config::Snapshot& config) { return config[kCcConfig]; }
       ) {
-    if (kCcExperiment.IsEnabled()) {
+    if (USERVER_NAMESPACE::utils::impl::kPgCcExperiment.IsEnabled()) {
         cc_controller_.Start();
     }
 }

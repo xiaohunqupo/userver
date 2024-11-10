@@ -38,8 +38,6 @@ namespace {
     }
 }
 
-utils::impl::UserverExperiment kServerSelectionTimeoutExperiment{"mongo-server-selection-timeout"};
-
 const std::string kMaintenanceTaskName = "mongo_maintenance";
 constexpr size_t kIdleConnectionDropRate = 1;
 
@@ -74,7 +72,7 @@ UriPtr MakeUri(const std::string& pool_id, const std::string& uri_string, const 
     mongoc_uri_set_option_as_int32(
         uri.get(), MONGOC_URI_CONNECTTIMEOUTMS, CheckedDurationMs(config.conn_timeout, MONGOC_URI_CONNECTTIMEOUTMS)
     );
-    if (kServerSelectionTimeoutExperiment.IsEnabled()) {
+    if (utils::impl::kServerSelectionTimeoutExperiment.IsEnabled()) {
         mongoc_uri_set_option_as_int32(uri.get(), MONGOC_URI_SERVERSELECTIONTIMEOUTMS, 3000);
     }
     mongoc_uri_set_option_as_int32(

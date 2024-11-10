@@ -34,7 +34,6 @@ ManagerConfig ParseFromAny(
 ) {
     constexpr std::string_view kConfigVarsField = "config_vars";
     constexpr std::string_view kManagerConfigField = "components_manager";
-    constexpr std::string_view kUserverExperimentsForceEnabledField = "userver_experiments_force_enabled";
 
     formats::yaml::Value config_yaml;
     try {
@@ -64,8 +63,13 @@ ManagerConfig ParseFromAny(
 
     auto config =
         yaml_config::YamlConfig(config_yaml, std::move(config_vars), yaml_config::YamlConfig::Mode::kEnvAndFileAllowed);
+    config.CheckObject();
+    for (const auto& [key, value] : Items(config)) {
+        if (key != kManagerConfigField && key != kConfigVarsField) {
+            throw std::runtime_error(fmt::format("Invalid config: extra key '{}' at the root level", key));
+        }
+    }
     auto result = config[kManagerConfigField].As<ManagerConfig>();
-    result.experiments_force_enabled = config[kUserverExperimentsForceEnabledField].As<bool>(false);
 
     return result;
 }
