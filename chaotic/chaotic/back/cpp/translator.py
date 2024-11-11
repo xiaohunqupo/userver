@@ -32,9 +32,9 @@ class GeneratorConfig:
 @dataclasses.dataclass
 class GeneratorState:
     types: Dict[str, cpp_types.CppType]
-    refs: Dict[types.Schema, str]
+    refs: Dict[types.Schema, str]  # type: ignore
     ref_objects: List[cpp_types.CppRef]
-    external_types: Dict[types.Schema, cpp_types.CppType]
+    external_types: Dict[types.Schema, cpp_types.CppType]  # type: ignore
 
 
 NON_NAME_SYMBOL_RE = re.compile('[^_0-9a-zA-Z]')

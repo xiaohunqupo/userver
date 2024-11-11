@@ -119,7 +119,7 @@ def make_arcadia_loader() -> jinja2.FunctionLoader:
             f'taxi/uservices/userver/chaotic/chaotic/back/cpp/{name}',
         ).decode('utf-8')
 
-    loader = jinja2.FunctionLoader(arc_resource_loader)
+    loader = jinja2.FunctionLoader(arc_resource_loader)  # type: ignore
 
     # try to load something and drop the result
     try:
