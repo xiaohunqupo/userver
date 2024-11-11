@@ -82,6 +82,8 @@ The following CMake options are used by userver:
 | USERVER_LTO_CACHE                      | Use LTO cache if present, disable for benchmarking build times                                                  | ON                                                     |
 | USERVER_LTO_CACHE_DIR                  | LTO cache directory                                                                                             | `${CMAKE_CURRENT_BINARY_DIR}/.ltocache`                |
 | USERVER_LTO_CACHE_SIZE_MB              | LTO cache size limit in MB                                                                                      | 6000                                                   |
+| USERVER_PGO_GENERATE                   | Generate PGO profile                                                                                            | OFF                                                    |
+| USERVER_PGO_USE                        | Path to PGO profile file                                                                                        | ''                                                     |
 | USERVER_USE_CCACHE                     | Use ccache if present, disable for benchmarking build times                                                     | ON                                                     |
 | USERVER_COMPILATION_TIME_TRACE         | Generate Clang compilation time trace                                                                           | OFF                                                    |
 | USERVER_NO_WERROR                      | Do not treat warnings as errors                                                                                 | ON                                                     |

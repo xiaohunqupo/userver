@@ -389,6 +389,7 @@ _userver_directory_install(COMPONENT universal FILES
     "${USERVER_ROOT_DIR}/cmake/sanitize-macos.blacklist.txt"
     "${USERVER_ROOT_DIR}/cmake/RequireLTO.cmake"
     "${USERVER_ROOT_DIR}/cmake/SetupLTO.cmake"
+    "${USERVER_ROOT_DIR}/cmake/SetupPGO.cmake"
     "${USERVER_ROOT_DIR}/cmake/SetupLinker.cmake"
     "${USERVER_ROOT_DIR}/cmake/Sanitizers.cmake"
     "${USERVER_ROOT_DIR}/cmake/AddGoogleTests.cmake"

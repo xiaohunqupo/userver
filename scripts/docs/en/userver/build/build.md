@@ -325,6 +325,19 @@ sudo git pull
 sudo ./scripts/build_and_install_all.sh
 ```
 
+## PGO (clang)
+
+PGO compilation consists of 2 compilation stages: profile collecting and compilation with PGO.
+You can use PGO compilation doing the following steps:
+
+1) configure userver AND your service with cmake option -DUSERVER_PGO_GENERATE=ON, compile the service;
+2) run the resulting binary under the production-like workload to collect profile;
+3) run llvm-profdata to convert profraw profile data format into profdata:
+   llvm-profdata merge -output=code.profdata default.profraw
+4) configure userver AND your service with cmake option -DUSERVER_PGO_USE=<path_to_profdata>, compile the service.
+
+The resulting binary should be 2-15% faster than without PGO, depending on the code and workload.
+
 ----------
 
 @htmlonly <div class="bottom-nav"> @endhtmlonly

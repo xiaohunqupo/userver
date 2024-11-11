@@ -357,6 +357,7 @@
   "cmake/SetupLTO.cmake":"taxi/uservices/userver/cmake/SetupLTO.cmake",
   "cmake/SetupLinker.cmake":"taxi/uservices/userver/cmake/SetupLinker.cmake",
   "cmake/SetupOpentelemetryProto.cmake":"taxi/uservices/userver/cmake/SetupOpentelemetryProto.cmake",
+  "cmake/SetupPGO.cmake":"taxi/uservices/userver/cmake/SetupPGO.cmake",
   "cmake/SetupPostgresqlDeps.cmake":"taxi/uservices/userver/cmake/SetupPostgresqlDeps.cmake",
   "cmake/SetupProtobuf.cmake":"taxi/uservices/userver/cmake/SetupProtobuf.cmake",
   "cmake/SetupRdKafka.cmake":"taxi/uservices/userver/cmake/SetupRdKafka.cmake",
