@@ -257,6 +257,8 @@ endif()
 
 add_subdirectory(libraries)
 
+add_subdirectory(scripts/gdb/tests)
+
 _userver_export_targets()
 _userver_make_install_config()
 
