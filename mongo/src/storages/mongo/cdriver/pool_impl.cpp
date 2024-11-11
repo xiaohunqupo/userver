@@ -15,6 +15,7 @@
 #include <userver/tracing/span.hpp>
 #include <userver/tracing/tags.hpp>
 #include <userver/utils/assert.hpp>
+#include <userver/utils/fast_scope_guard.hpp>
 #include <userver/utils/impl/userver_experiments.hpp>
 #include <userver/utils/traceful_exception.hpp>
 
@@ -193,6 +194,11 @@ std::string CreateTopologyChangeMessage(const mongoc_apm_topology_changed_t* eve
     std::size_t nnew_server_desc{0};
     mongoc_server_description_t** new_sds = mongoc_topology_description_get_servers(new_td, &nnew_server_desc);
 
+    const utils::FastScopeGuard server_descriptions_guard{[&]() noexcept {
+        mongoc_server_descriptions_destroy_all(prev_sds, nprev_server_desc);
+        mongoc_server_descriptions_destroy_all(new_sds, nnew_server_desc);
+    }};
+
     std::string topology_msg{fmt::format(
         "Topology changed: {} -> {}",
         mongoc_topology_description_type(prev_td),
@@ -224,6 +230,7 @@ std::string CreateTopologyChangeMessage(const mongoc_apm_topology_changed_t* eve
     }
 
     mongoc_read_prefs_t* prefs = mongoc_read_prefs_new(MONGOC_READ_SECONDARY);
+    const utils::FastScopeGuard prefs_guard{[&prefs]() noexcept { mongoc_read_prefs_destroy(prefs); }};
 
 #if MONGOC_CHECK_VERSION(1, 17, 0)
     if (mongoc_topology_description_has_readable_server(new_td, prefs)) {
@@ -244,10 +251,6 @@ std::string CreateTopologyChangeMessage(const mongoc_apm_topology_changed_t* eve
     } else {
         topology_msg.append("Primary UNAVAILABLE");
     }
-
-    mongoc_read_prefs_destroy(prefs);
-    mongoc_server_descriptions_destroy_all(prev_sds, nprev_server_desc);
-    mongoc_server_descriptions_destroy_all(new_sds, nnew_server_desc);
 
     return topology_msg;
 }
