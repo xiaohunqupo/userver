@@ -33,6 +33,7 @@ jobs:
                     os: ubuntu-24.04
                     info: clang-18 + debug + sanitize addr+ub
                     tests-flags: ''
+                    ccache-dir: ~/.cache/ccache
 
                   - cmake-flags: >-
                         -DCMAKE_CXX_COMPILER=clang++-14
@@ -49,6 +50,7 @@ jobs:
                     os: ubuntu-22.04
                     info: clang-14 + debug + sanitize addr+ub
                     tests-flags: ''
+                    ccache-dir: ~/.cache/ccache
 
                   - cmake-flags: >-
                         -DUSERVER_FEATURE_CRYPTOPP_BLAKE2=0
@@ -60,6 +62,7 @@ jobs:
                     os: ubuntu-20.04
                     info: g++-9 + release
                     tests-flags: '--gtest_filter=-HttpClient.RedirectHeaders:HttpClient.TestUseIPv4v6'
+                    ccache-dir: ~/.ccache
 
                   # GCC-8 - testing minimal required compiler
                   - cmake-flags: >-
@@ -74,6 +77,7 @@ jobs:
                     os: ubuntu-20.04
                     info: g++-8 + debug
                     tests-flags: '--gtest_filter=-HttpClient.RedirectHeaders:HttpClient.TestUseIPv4v6'
+                    ccache-dir: ~/.ccache
 
         name: '${{matrix.os}}: ${{matrix.info}}'
         runs-on: ${{matrix.os}}
@@ -86,7 +90,7 @@ jobs:
           - name: Reuse ccache directory
             uses: actions/cache@v4
             with:
-                path: ~/.ccache
+                path: '${{matrix.ccache-dir}}'
                 key: '${{matrix.os}} ${{matrix.info}} ccache-dir ${{github.ref}} run-${{github.run_number}}'
                 restore-keys: |
                     ${{matrix.os}} ${{matrix.info}} ccache-dir ${{github.ref}} run-'
@@ -192,7 +196,7 @@ jobs:
           - name: Install g++-8
             if: matrix.info == 'g++-8 + debug'
             run: |
-              sudo apt install --allow-downgrades -y g++-8
+                sudo apt install --allow-downgrades -y g++-8
 
           - name: Install RabbitMQ packages
             run: |
