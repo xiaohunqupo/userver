@@ -114,6 +114,7 @@ class UserverConan(ConanFile):
         self.requires('concurrentqueue/1.0.3', transitive_headers=True)
         self.requires('cryptopp/8.9.0')
         self.requires('fmt/8.1.1', transitive_headers=True)
+        self.requires('libiconv/1.17')
         self.requires('libnghttp2/1.61.0')
         self.requires('libcurl/7.86.0')
         self.requires('libev/4.33')
@@ -421,6 +422,9 @@ class UserverConan(ConanFile):
         def yaml():
             return ['yaml-cpp::yaml-cpp']
 
+        def iconv():
+            return ['libiconv::libiconv']
+
         def libev():
             return ['libev::libev']
 
@@ -501,6 +505,7 @@ class UserverConan(ConanFile):
                     + boost()
                     + concurrentqueue()
                     + yaml()
+                    + iconv()
                     + libev()
                     + libnghttp2()
                     + curl()

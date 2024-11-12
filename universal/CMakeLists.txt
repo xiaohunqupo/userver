@@ -53,7 +53,6 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   endif()
 endif()
 
-find_package(Iconv REQUIRED)
 find_package_required(OpenSSL "libssl-dev")
 
 if (USERVER_CONAN)
