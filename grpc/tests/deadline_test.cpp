@@ -335,7 +335,7 @@ UTEST_F(GrpcTestClientNotSendData, TestClientDoNotStartCallWithoutDeadline) {
     // Wait for deadline before request
     tests::WaitUntilRpcDeadlineClient(task_deadline);
     // Context deadline not set
-    auto call = Client().SayHello(request, tests::GetContext(false));
+    auto call = Client().SayHello(request, tests::MakeClientContext(/*set_deadline=*/false));
 
     sample::ugrpc::GreetingResponse in;
     UEXPECT_THROW(in = call.Finish(), ugrpc::client::DeadlineExceededError);
@@ -351,7 +351,7 @@ UTEST_F(GrpcTestClientNotSendData, TestClientDoNotStartCallWithDeadline) {
     // Wait for deadline before request
     tests::WaitUntilRpcDeadlineClient(task_deadline);
     // Set additional client deadline
-    auto call = Client().SayHello(request, tests::GetContext(true));
+    auto call = Client().SayHello(request, tests::MakeClientContext(/*set_deadline=*/true));
 
     sample::ugrpc::GreetingResponse in;
     UEXPECT_THROW(in = call.Finish(), ugrpc::client::DeadlineExceededError);

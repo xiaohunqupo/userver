@@ -26,7 +26,7 @@ namespace {
 
 class AsyncTestService final : public sample::ugrpc::UnitTestServiceBase {
 public:
-    void SayHello(SayHelloCall& call, sample::ugrpc::GreetingRequest&&) override {
+    SayHelloResult SayHello(CallContext& /*context*/, sample::ugrpc::GreetingRequest&& /*request*/) override {
         // Only send response on manual triggers
         bool wait_result = false;
         {
@@ -39,12 +39,11 @@ public:
         }
 
         if (!wait_result) {
-            call.FinishWithError({grpc::StatusCode::INTERNAL, "failed to wait for event", "details"});
-            return;
+            return grpc::Status{grpc::StatusCode::INTERNAL, "failed to wait for event", "details"};
         }
         sample::ugrpc::GreetingResponse response;
         response.set_name("Hello");
-        call.Finish(response);
+        return response;
     }
 
     // This method can be called from the tests

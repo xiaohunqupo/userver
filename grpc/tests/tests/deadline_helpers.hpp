@@ -28,9 +28,9 @@ constexpr auto kAddSleep = std::chrono::milliseconds{100};
 
 const std::string kGrpcMethod = "grpc_method";
 
-inline std::unique_ptr<grpc::ClientContext> GetContext(bool need_deadline) {
+inline std::unique_ptr<grpc::ClientContext> MakeClientContext(bool set_deadline) {
     auto context = std::make_unique<grpc::ClientContext>();
-    if (need_deadline) {
+    if (set_deadline) {
         context->set_deadline(engine::Deadline::FromDuration(kLongTimeout));
     }
     return context;
@@ -47,12 +47,6 @@ inline void WaitUntilRpcDeadlineClient(engine::Deadline deadline) {
     // kAddSleep is needed, because otherwise the background timer from grpc-core
     // might not manage to cancel the ClientContext in time.
     engine::SleepFor(kAddSleep);
-}
-
-inline void WaitUntilRpcDeadline(ugrpc::server::CallAnyBase& /*call*/) { WaitUntilRpcDeadlineService(); }
-
-inline void WaitUntilRpcDeadline(ugrpc::client::CallAnyBase& call) {
-    WaitUntilRpcDeadlineClient(engine::Deadline::FromTimePoint(call.GetContext().deadline()));
 }
 
 }  // namespace tests

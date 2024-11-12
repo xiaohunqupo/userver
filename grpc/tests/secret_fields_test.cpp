@@ -25,13 +25,13 @@ constexpr std::string_view kToken = "token-value";
 
 class Messenger final : public sample::ugrpc::MessengerBase {
 public:
-    void Send(SendCall& call, sample::ugrpc::SendRequest&& /*request*/) override {
+    SendResult Send(CallContext& /*context*/, sample::ugrpc::SendRequest&& /*request*/) override {
         sample::ugrpc::SendResponse response;
         response.set_delivered(true);
         response.mutable_reply()->set_text(grpc::string{kResponseText});
         response.set_token(grpc::string{kToken});
 
-        call.Finish(response);
+        return response;
     }
 };
 

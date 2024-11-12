@@ -46,12 +46,12 @@ std::vector<dynamic_config::KeyValue> MakePerRpcQosConfig(std::chrono::milliseco
 
 class UnitTestOkService final : public sample::ugrpc::UnitTestServiceBase {
 public:
-    void SayHello(SayHelloCall& call, sample::ugrpc::GreetingRequest&& request) override {
+    SayHelloResult SayHello(CallContext& /*context*/, sample::ugrpc::GreetingRequest&& request) override {
         engine::InterruptibleSleepFor(tests::kShortTimeout);
 
         sample::ugrpc::GreetingResponse response;
         response.set_name("Hello " + request.name());
-        call.Finish(response);
+        return response;
     }
 };
 

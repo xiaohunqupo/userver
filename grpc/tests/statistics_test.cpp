@@ -19,13 +19,13 @@ namespace {
 
 class UnitTestServiceForStatistics final : public sample::ugrpc::UnitTestServiceBase {
 public:
-    void SayHello(SayHelloCall& call, sample::ugrpc::GreetingRequest&&) override {
+    SayHelloResult SayHello(CallContext& /*context*/, sample::ugrpc::GreetingRequest&& /*request*/) override {
         engine::SleepFor(std::chrono::milliseconds{20});
-        call.FinishWithError({grpc::StatusCode::INVALID_ARGUMENT, "message", "details"});
+        return grpc::Status{grpc::StatusCode::INVALID_ARGUMENT, "message", "details"};
     }
 
-    void Chat(ChatCall& call) override {
-        call.FinishWithError({grpc::StatusCode::UNIMPLEMENTED, "message", "details"});
+    ChatResult Chat(CallContext& /*context*/, ChatReaderWriter& /*stream*/) override {
+        return grpc::Status{grpc::StatusCode::UNIMPLEMENTED, "message", "details"};
     }
 };
 

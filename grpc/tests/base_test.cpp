@@ -32,16 +32,16 @@ void CheckServerContext(grpc::ServerContext& context) {
 
 class UnitTestLongAnswerService final : public sample::ugrpc::UnitTestServiceBase {
 public:
-    void SayHello(SayHelloCall& call, sample::ugrpc::GreetingRequest&& request) override {
+    SayHelloResult SayHello(CallContext& context, sample::ugrpc::GreetingRequest&& request) override {
         if (request.name() != "default_context") {
-            CheckServerContext(call.GetContext());
+            CheckServerContext(context.GetServerContext());
         }
         sample::ugrpc::GreetingResponse response;
         response.set_name("Hello " + request.name());
 
         engine::SleepUntil(engine::Deadline::FromDuration(answer_duration_));
 
-        call.Finish(response);
+        return response;
     }
 
     void SetAnswerDuration(std::chrono::milliseconds duration) { answer_duration_ = duration; };
@@ -52,51 +52,52 @@ private:
 
 class UnitTestService final : public sample::ugrpc::UnitTestServiceBase {
 public:
-    void SayHello(SayHelloCall& call, sample::ugrpc::GreetingRequest&& request) override {
+    SayHelloResult SayHello(CallContext& context, sample::ugrpc::GreetingRequest&& request) override {
         if (request.name() != "default_context") {
-            CheckServerContext(call.GetContext());
+            CheckServerContext(context.GetServerContext());
         }
         sample::ugrpc::GreetingResponse response;
         response.set_name("Hello " + request.name());
-        call.Finish(response);
+        return response;
     }
 
-    void ReadMany(ReadManyCall& call, sample::ugrpc::StreamGreetingRequest&& request) override {
-        CheckServerContext(call.GetContext());
+    ReadManyResult
+    ReadMany(CallContext& context, sample::ugrpc::StreamGreetingRequest&& request, ReadManyWriter& writer) override {
+        CheckServerContext(context.GetServerContext());
         sample::ugrpc::StreamGreetingResponse response;
         response.set_name("Hello again " + request.name());
         for (int i = 0; i < request.number(); ++i) {
             response.set_number(i);
-            call.Write(response);
+            writer.Write(response);
         }
-        call.Finish();
+        return grpc::Status::OK;
     }
 
-    void WriteMany(WriteManyCall& call) override {
-        CheckServerContext(call.GetContext());
+    WriteManyResult WriteMany(CallContext& context, WriteManyReader& reader) override {
+        CheckServerContext(context.GetServerContext());
         sample::ugrpc::StreamGreetingRequest request;
         int count = 0;
-        while (call.Read(request)) {
+        while (reader.Read(request)) {
             ++count;
         }
         sample::ugrpc::StreamGreetingResponse response;
         response.set_name("Hello");
         response.set_number(count);
-        call.Finish(response);
+        return response;
     }
 
-    void Chat(ChatCall& call) override {
-        CheckServerContext(call.GetContext());
+    ChatResult Chat(CallContext& context, ChatReaderWriter& stream) override {
+        CheckServerContext(context.GetServerContext());
         sample::ugrpc::StreamGreetingRequest request;
         sample::ugrpc::StreamGreetingResponse response;
         int count = 0;
-        while (call.Read(request)) {
+        while (stream.Read(request)) {
             ++count;
             response.set_number(count);
             response.set_name("Hello " + request.name());
-            call.Write(response);
+            stream.Write(response);
         }
-        call.Finish();
+        return grpc::Status::OK;
     }
 };
 
@@ -360,18 +361,20 @@ namespace {
 
 class WriteAndFinishService final : public sample::ugrpc::UnitTestServiceBase {
 public:
-    void ReadMany(ReadManyCall& call, sample::ugrpc::StreamGreetingRequest&& request) override {
+    ReadManyResult
+    ReadMany(CallContext& /*context*/, sample::ugrpc::StreamGreetingRequest&& request, ReadManyWriter& /*writer*/)
+        override {
         sample::ugrpc::StreamGreetingResponse response;
         response.set_number(kNumber);
         response.set_name("Hello " + request.name());
-        call.WriteAndFinish(response);
+        return response;
     }
 
-    void Chat(ChatCall& call) override {
+    ChatResult Chat(CallContext& /*context*/, ChatReaderWriter& /*stream*/) override {
         sample::ugrpc::StreamGreetingResponse response;
         response.set_number(kNumber);
         response.set_name("Hello");
-        call.WriteAndFinish(response);
+        return response;
     }
 };
 

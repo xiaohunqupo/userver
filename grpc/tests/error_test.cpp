@@ -21,19 +21,23 @@ namespace {
 
 class UnitTestServiceWithError final : public sample::ugrpc::UnitTestServiceBase {
 public:
-    void SayHello(SayHelloCall& call, sample::ugrpc::GreetingRequest&&) override {
-        call.FinishWithError({grpc::StatusCode::INTERNAL, "message", "details"});
+    SayHelloResult SayHello(CallContext& /*context*/, sample::ugrpc::GreetingRequest&& /*request*/) override {
+        return grpc::Status{grpc::StatusCode::INTERNAL, "message", "details"};
     }
 
-    void ReadMany(ReadManyCall& call, sample::ugrpc::StreamGreetingRequest&&) override {
-        call.FinishWithError({grpc::StatusCode::INTERNAL, "message", "details"});
+    ReadManyResult
+    ReadMany(CallContext& /*context*/, sample::ugrpc::StreamGreetingRequest&& /*request*/, ReadManyWriter& /*writer*/)
+        override {
+        return grpc::Status{grpc::StatusCode::INTERNAL, "message", "details"};
     }
 
-    void WriteMany(WriteManyCall& call) override {
-        call.FinishWithError({grpc::StatusCode::INTERNAL, "message", "details"});
+    WriteManyResult WriteMany(CallContext& /*context*/, WriteManyReader& /*reader*/) override {
+        return grpc::Status{grpc::StatusCode::INTERNAL, "message", "details"};
     }
 
-    void Chat(ChatCall& call) override { call.FinishWithError({grpc::StatusCode::INTERNAL, "message", "details"}); }
+    ChatResult Chat(CallContext& /*context*/, ChatReaderWriter& /*stream*/) override {
+        return grpc::Status{grpc::StatusCode::INTERNAL, "message", "details"};
+    }
 };
 
 class UnitTestServiceWithDetailedError final : public sample::ugrpc::UnitTestServiceBase {
@@ -59,7 +63,9 @@ public:
         return ugrpc::impl::ToGrpcStatus(status_obj);
     }
 
-    void SayHello(SayHelloCall& call, sample::ugrpc::GreetingRequest&&) override { call.FinishWithError(MakeError()); }
+    SayHelloResult SayHello(CallContext& /*context*/, sample::ugrpc::GreetingRequest&& /*request*/) override {
+        return MakeError();
+    }
 };
 
 }  // namespace
@@ -148,7 +154,9 @@ namespace {
 
 class ThrowCustomService final : public sample::ugrpc::UnitTestServiceBase {
 public:
-    void ReadMany(ReadManyCall&, sample::ugrpc::StreamGreetingRequest&&) override {
+    ReadManyResult
+    ReadMany(CallContext& /*context*/, sample::ugrpc::StreamGreetingRequest&& /*request*/, ReadManyWriter& /*writer*/)
+        override {
         throw server::handlers::Unauthorized(server::handlers::ExternalBody{"abba"});
     }
 };

@@ -34,7 +34,7 @@ UTEST_F(GrpcServerAllUnimplementedTest, Unimplemented) {
 
 class ChatOnlyService final : public sample::ugrpc::UnitTestServiceBase {
 public:
-    void Chat(ChatCall& call) override { call.Finish(); }
+    ChatResult Chat(CallContext& /*context*/, ChatReaderWriter& /*stream*/) override { return grpc::Status::OK; }
 };
 
 using GrpcServerSomeUnimplementedTest = ugrpc::tests::ServiceFixture<ChatOnlyService>;

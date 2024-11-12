@@ -30,26 +30,26 @@ const grpc::string kClientLinkEcho = "client-link-echo";
 
 class UnitTestServiceWithTracingChecks final : public sample::ugrpc::UnitTestServiceBase {
 public:
-    void SayHello(SayHelloCall& call, sample::ugrpc::GreetingRequest&&) override {
-        SetMetadata(call.GetContext());
-        sample::ugrpc::GreetingResponse response{};
-        call.Finish(response);
+    SayHelloResult SayHello(CallContext& context, sample::ugrpc::GreetingRequest&& /*request*/) override {
+        SetMetadata(context.GetServerContext());
+        return sample::ugrpc::GreetingResponse{};
     }
 
-    void ReadMany(ReadManyCall& call, sample::ugrpc::StreamGreetingRequest&&) override {
-        SetMetadata(call.GetContext());
-        call.Finish();
+    ReadManyResult
+    ReadMany(CallContext& context, sample::ugrpc::StreamGreetingRequest&& /*request*/, ReadManyWriter& /*writer*/)
+        override {
+        SetMetadata(context.GetServerContext());
+        return grpc::Status::OK;
     }
 
-    void WriteMany(WriteManyCall& call) override {
-        SetMetadata(call.GetContext());
-        sample::ugrpc::StreamGreetingResponse response{};
-        call.Finish(response);
+    WriteManyResult WriteMany(CallContext& context, WriteManyReader& /*reader*/) override {
+        SetMetadata(context.GetServerContext());
+        return sample::ugrpc::StreamGreetingResponse{};
     }
 
-    void Chat(ChatCall& call) override {
-        SetMetadata(call.GetContext());
-        call.Finish();
+    ChatResult Chat(CallContext& context, ChatReaderWriter& /*stream*/) override {
+        SetMetadata(context.GetServerContext());
+        return grpc::Status::OK;
     }
 
 private:

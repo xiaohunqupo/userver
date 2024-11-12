@@ -29,7 +29,7 @@ namespace {
 
 class ServerBaggageTestService final : public sample::ugrpc::UnitTestServiceBase {
 public:
-    void SayHello(SayHelloCall& call, sample::ugrpc::GreetingRequest&&) override {
+    SayHelloResult SayHello(CallContext& /*context*/, sample::ugrpc::GreetingRequest&& /*request*/) override {
         sample::ugrpc::GreetingResponse response;
         const auto* bg = baggage::BaggageManager::TryGetBaggage();
 
@@ -39,7 +39,7 @@ public:
             response.set_name("null");
         }
 
-        call.Finish(response);
+        return response;
     }
 };
 
@@ -122,9 +122,10 @@ namespace {
 
 class ClientBaggageTestService final : public sample::ugrpc::UnitTestServiceBase {
 public:
-    void SayHello(SayHelloCall& call, sample::ugrpc::GreetingRequest&&) override {
+    SayHelloResult SayHello(CallContext& context, sample::ugrpc::GreetingRequest&& /*request*/) override {
         sample::ugrpc::GreetingResponse response;
-        const auto* baggage_header = utils::FindOrNullptr(call.GetContext().client_metadata(), ugrpc::impl::kXBaggage);
+        const auto* baggage_header =
+            utils::FindOrNullptr(context.GetServerContext().client_metadata(), ugrpc::impl::kXBaggage);
 
         if (baggage_header) {
             response.set_name(ugrpc::impl::ToString(*baggage_header));
@@ -132,7 +133,7 @@ public:
             response.set_name("null");
         }
 
-        call.Finish(response);
+        return response;
     }
 };
 

@@ -16,8 +16,8 @@ namespace {
 
 class Messenger final : public sample::ugrpc::UnitTestServiceBase {
 public:
-    void SayHello(SayHelloCall& call, sample::ugrpc::GreetingRequest&& /*request*/) override {
-        call.Finish(sample::ugrpc::GreetingResponse{});
+    SayHelloResult SayHello(CallContext& /*context*/, ::sample::ugrpc::GreetingRequest&& /*request*/) override {
+        return sample::ugrpc::GreetingResponse{};
     }
 };
 
