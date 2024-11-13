@@ -126,13 +126,16 @@ private:
     void MarkConsumerIsDead();
     void MarkProducerIsDead();
 
+    bool NoMoreProducers() const { return producer_is_created_ && producers_count_ == 0; }
+    bool NoMoreConsumers() const { return consumer_is_created_and_dead_; }
+
     impl::IntrusiveMpscQueue<Node> queue_{};
     engine::SingleConsumerEvent nonempty_event_{};
     engine::CancellableSemaphore remaining_capacity_;
     impl::SemaphoreCapacityControl remaining_capacity_control_;
     std::atomic<bool> consumer_is_created_{false};
     std::atomic<bool> consumer_is_created_and_dead_{false};
-    std::atomic<bool> producer_is_created_and_dead_{false};
+    std::atomic<bool> producer_is_created_{false};
     std::atomic<size_t> producers_count_{0};
     std::atomic<size_t> size_{0};
 };
@@ -149,8 +152,8 @@ MpscQueue<T>::~MpscQueue() {
 
 template <typename T>
 typename MpscQueue<T>::Producer MpscQueue<T>::GetProducer() {
-    producers_count_++;
-    producer_is_created_and_dead_ = false;
+    ++producers_count_;
+    producer_is_created_ = true;
     nonempty_event_.Send();
     return Producer(this->shared_from_this(), EmplaceEnabler{});
 }
@@ -196,7 +199,7 @@ bool MpscQueue<T>::PushNoblock(ProducerToken& token, T&& value) {
 
 template <typename T>
 bool MpscQueue<T>::DoPush(ProducerToken& /*unused*/, T&& value) {
-    if (consumer_is_created_and_dead_) {
+    if (NoMoreConsumers()) {
         remaining_capacity_.unlock_shared();
         return false;
     }
@@ -213,15 +216,23 @@ bool MpscQueue<T>::DoPush(ProducerToken& /*unused*/, T&& value) {
 
 template <typename T>
 bool MpscQueue<T>::Pop(ConsumerToken& token, T& value, engine::Deadline deadline) {
-    while (!DoPop(token, value)) {
-        if (producer_is_created_and_dead_ || !nonempty_event_.WaitForEventUntil(deadline)) {
+    bool no_more_producers = false;
+    const bool success = nonempty_event_.WaitUntil(deadline, [&] {
+        if (DoPop(token, value)) {
+            return true;
+        }
+        if (NoMoreProducers()) {
             // Producer might have pushed something in queue between .pop()
             // and !producer_is_created_and_dead_ check. Check twice to avoid
             // TOCTOU.
-            return DoPop(token, value);
+            if (!DoPop(token, value)) {
+                no_more_producers = true;
+            }
+            return true;
         }
-    }
-    return true;
+        return false;
+    });
+    return success && !no_more_producers;
 }
 
 template <typename T>
@@ -250,8 +261,9 @@ void MpscQueue<T>::MarkConsumerIsDead() {
 
 template <typename T>
 void MpscQueue<T>::MarkProducerIsDead() {
-    producer_is_created_and_dead_ = (--producers_count_ == 0);
-    nonempty_event_.Send();
+    if (--producers_count_ == 0) {
+        nonempty_event_.Send();
+    }
 }
 
 }  // namespace concurrent

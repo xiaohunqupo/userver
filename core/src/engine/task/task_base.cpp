@@ -55,27 +55,24 @@ std::string_view TaskBase::GetStateName(State state) {
 
 bool TaskBase::IsFinished() const { return pimpl_->context && pimpl_->context->IsFinished(); }
 
-void TaskBase::Wait() const noexcept(false) {
-    UASSERT(pimpl_->context);
-    pimpl_->context->Wait();
-}
+void TaskBase::Wait() const noexcept(false) { WaitUntil(Deadline{}); }
 
 void TaskBase::WaitUntil(Deadline deadline) const {
-    UASSERT(pimpl_->context);
-    pimpl_->context->WaitUntil(deadline);
+    const auto status = WaitNothrowUntil(deadline);
+    if (status == FutureStatus::kCancelled) {
+        throw WaitInterruptedException(current_task::CancellationReason());
+    }
 }
 
-void TaskBase::RequestCancel() {
-    UASSERT(pimpl_->context);
-    pimpl_->context->RequestCancel(TaskCancellationReason::kUserRequest);
-}
+bool TaskBase::WaitNothrow() const noexcept { return WaitNothrowUntil(Deadline{}) == FutureStatus::kReady; }
+
+FutureStatus TaskBase::WaitNothrowUntil(Deadline deadline) const noexcept { return GetContext().WaitUntil(deadline); }
+
+void TaskBase::RequestCancel() { GetContext().RequestCancel(TaskCancellationReason::kUserRequest); }
 
 void TaskBase::SyncCancel() noexcept { Terminate(TaskCancellationReason::kUserRequest); }
 
-TaskCancellationReason TaskBase::CancellationReason() const {
-    UASSERT(pimpl_->context);
-    return pimpl_->context->CancellationReason();
-}
+TaskCancellationReason TaskBase::CancellationReason() const { return GetContext().CancellationReason(); }
 
 void TaskBase::BlockingWait() const {
     UASSERT(pimpl_->context);
@@ -86,7 +83,8 @@ void TaskBase::BlockingWait() const {
 
     std::packaged_task<void()> task([&context] {
         const TaskCancellationBlocker block_cancels;
-        context.Wait();
+        const auto status = context.WaitUntil(Deadline{});
+        UASSERT(status == FutureStatus::kReady);
     });
     auto future = task.get_future();
 
@@ -123,10 +121,7 @@ impl::TaskContext& TaskBase::GetContext() const noexcept {
 
 bool TaskBase::HasSameContext(const TaskBase& other) const noexcept { return pimpl_->context == other.pimpl_->context; }
 
-utils::impl::WrappedCallBase& TaskBase::GetPayload() const noexcept {
-    UASSERT(pimpl_->context);
-    return pimpl_->context->GetPayload();
-}
+utils::impl::WrappedCallBase& TaskBase::GetPayload() const noexcept { return GetContext().GetPayload(); }
 
 void TaskBase::Terminate(TaskCancellationReason reason) noexcept {
     if (!pimpl_->context) {

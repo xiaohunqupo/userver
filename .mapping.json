@@ -727,6 +727,7 @@
   "core/include/userver/engine/subprocess/environment_variables.hpp":"taxi/uservices/userver/core/include/userver/engine/subprocess/environment_variables.hpp",
   "core/include/userver/engine/subprocess/process_starter.hpp":"taxi/uservices/userver/core/include/userver/engine/subprocess/process_starter.hpp",
   "core/include/userver/engine/task/cancel.hpp":"taxi/uservices/userver/core/include/userver/engine/task/cancel.hpp",
+  "core/include/userver/engine/task/current_task.hpp":"taxi/uservices/userver/core/include/userver/engine/task/current_task.hpp",
   "core/include/userver/engine/task/inherited_variable.hpp":"taxi/uservices/userver/core/include/userver/engine/task/inherited_variable.hpp",
   "core/include/userver/engine/task/local_variable.hpp":"taxi/uservices/userver/core/include/userver/engine/task/local_variable.hpp",
   "core/include/userver/engine/task/shared_task.hpp":"taxi/uservices/userver/core/include/userver/engine/task/shared_task.hpp",
