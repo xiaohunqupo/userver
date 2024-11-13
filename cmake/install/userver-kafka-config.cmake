@@ -8,7 +8,7 @@ find_package(userver REQUIRED COMPONENTS
   core
 )
 
-include("${USERVER_CMAKE_DIR}/FindLZ4.cmake")
-include("${USERVER_CMAKE_DIR}/FindRdKafka.cmake")
+include("${USERVER_CMAKE_DIR}/modules/FindLZ4.cmake")
+include("${USERVER_CMAKE_DIR}/modules/FindRdKafka.cmake")
 
 set(userver_kafka_FOUND TRUE)

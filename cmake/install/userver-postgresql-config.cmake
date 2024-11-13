@@ -17,6 +17,6 @@ else()
   message(STATUS "libpq patches disabled")
 endif()
 
-include(UserverSql)
+include("${USERVER_CMAKE_DIR}/UserverSql.cmake")
 
 set(userver_postgresql_FOUND TRUE)

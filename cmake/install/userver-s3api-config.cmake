@@ -8,7 +8,7 @@ find_package(userver REQUIRED COMPONENTS
     core
 )
 
-include("${USERVER_CMAKE_DIR}/FindPugixml.cmake")
+include("${USERVER_CMAKE_DIR}/modules/FindPugixml.cmake")
 
 set(userver_s3api_FOUND TRUE)
 
