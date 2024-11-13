@@ -49,6 +49,7 @@ In this sample we use a single handler to deal with all the HTTP methods. The Ke
 Postgres driver in userver implicitly works with prepared statements. For the first time you execute the query a prepared statement is created. Executing the query next time would result in only sending the arguments for the already created prepared statement.
 
 You could pass strings as queries, just like we done in constructor of KeyValue. Also queries could be stored in variables along with query names and reused across the functions. Name of the query could be used in dynamic configs to set the execution timeouts (see @ref POSTGRES_QUERIES_COMMAND_CONTROL).
+You can ease query definition by using @ref scripts/docs/en/userver/sql_files.md.
 
 @snippet samples/postgres_service/postgres_service.cpp  Postgres service sample - GetValue
 
@@ -58,6 +59,7 @@ You could pass strings as queries, just like we done in constructor of KeyValue.
 You can start a transaction by calling storages::postgres::Cluster::Begin(). Transactions are automatically rolled back, if you do not commit them.
 To execute a query in transaction, just call Execute member function of a transaction. Just like with non-transactional Execute, you can pass string or storages::postgres::Query, you could reuse the 
 same query in different functions. Transactions also could be named, and those names could be used in @ref POSTGRES_QUERIES_COMMAND_CONTROL.
+You can ease query definition by using @ref scripts/docs/en/userver/sql_files.md.
 
 @snippet samples/postgres_service/postgres_service.cpp  Postgres service sample - PostValue
 
@@ -67,7 +69,6 @@ same query in different functions. Transactions also could be named, and those n
 Note that mutating queries should be executed on a master instance.
 
 @snippet samples/postgres_service/postgres_service.cpp  Postgres service sample - DeleteValue
-
 
 ### Static config
 

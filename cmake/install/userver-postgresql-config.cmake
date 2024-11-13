@@ -17,4 +17,6 @@ else()
   message(STATUS "libpq patches disabled")
 endif()
 
+include(UserverSql)
+
 set(userver_postgresql_FOUND TRUE)
