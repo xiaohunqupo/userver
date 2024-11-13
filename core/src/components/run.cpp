@@ -73,15 +73,19 @@ private:
 };
 
 void HandleJemallocSettings() {
-    static constexpr size_t kDefaultMaxBgThreads = 1;
-
-    auto ec = utils::jemalloc::SetMaxBgThreads(kDefaultMaxBgThreads);
-    if (ec) {
-        LOG_WARNING() << "Failed to set max_background_threads to " << kDefaultMaxBgThreads;
-    }
+    static constexpr std::size_t kDefaultMaxBgThreads = 1;
 
     if (utils::impl::kJemallocBgThread.IsEnabled()) {
-        utils::jemalloc::EnableBgThreads();
+        auto ec = utils::jemalloc::SetMaxBgThreads(kDefaultMaxBgThreads);
+        if (ec) {
+            LOG_WARNING() << "Failed to set max_background_threads to " << kDefaultMaxBgThreads
+                          << ", code: " << ec.value();
+        }
+
+        ec = utils::jemalloc::EnableBgThreads();
+        if (ec) {
+            LOG_WARNING() << "Failed to enable background_thread, code: " << ec.value();
+        }
     }
 }
 
