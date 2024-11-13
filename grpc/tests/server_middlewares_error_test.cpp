@@ -51,6 +51,7 @@ private:
     MiddlewareFlag settings_;
 };
 
+// NOLINTNEXTLINE(fuchsia-multiple-inheritance)
 class MockMessengerServiceFixture : public ugrpc::tests::ServiceFixtureBase,
                                     public testing::WithParamInterface<MiddlewareFlags> {
 protected:

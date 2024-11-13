@@ -44,6 +44,7 @@ enum class MiddlewareFlag {
 
 using MiddlewareFlags = utils::Flags<MiddlewareFlag>;
 
+// NOLINTNEXTLINE(fuchsia-multiple-inheritance)
 class SecretFieldsServiceFixture : public ugrpc::tests::ServiceFixtureBase,
                                    public testing::WithParamInterface<MiddlewareFlags> {
 protected:
