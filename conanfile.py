@@ -1,5 +1,6 @@
 # pylint: disable=no-member
 import os
+import platform
 import re
 
 from conan import ConanFile
@@ -47,7 +48,7 @@ class UserverConan(ConanFile):
     default_options = {
         'fPIC': True,
         'lto': False,
-        'with_jemalloc': True,
+        'with_jemalloc': (platform.system() != 'Darwin'),
         'with_mongodb': True,
         'with_postgresql': True,
         'with_postgresql_extra': False,
