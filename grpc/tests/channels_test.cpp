@@ -27,10 +27,10 @@ namespace {
 
 class UnitTestServiceSimple final : public sample::ugrpc::UnitTestServiceBase {
 public:
-    void SayHello(SayHelloCall& call, sample::ugrpc::GreetingRequest&&) override {
+    SayHelloResult SayHello(CallContext& /*context*/, sample::ugrpc::GreetingRequest&& /*request*/) override {
         sample::ugrpc::GreetingResponse response{};
-        call.Finish(response);
         EXPECT_FALSE(engine::current_task::ShouldCancel());
+        return response;
     }
 };
 

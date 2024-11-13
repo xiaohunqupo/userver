@@ -28,15 +28,19 @@ namespace {
 
 class UnitTestServiceCancelEcho final : public sample::ugrpc::UnitTestServiceBase {
 public:
-    void Chat(ChatCall& call) override {
+    ChatResult Chat(CallContext& /*context*/, ChatReaderWriter& stream) override {
         sample::ugrpc::StreamGreetingRequest request;
-        ASSERT_TRUE(call.Read(request));
         sample::ugrpc::StreamGreetingResponse response{};
-        // NOLINTNEXTLINE(clang-analyzer-optin.cplusplus.UninitializedObject)
-        UASSERT_NO_THROW(call.Write(response));
 
-        ASSERT_FALSE(call.Read(request));
-        UASSERT_THROW(call.Finish(), ugrpc::server::RpcInterruptedError);
+        EXPECT_TRUE(stream.Read(request));
+        // NOLINTNEXTLINE(clang-analyzer-optin.cplusplus.UninitializedObject)
+        UEXPECT_NO_THROW(stream.Write(response));
+
+        EXPECT_FALSE(stream.Read(request));
+        // NOLINTNEXTLINE(clang-analyzer-optin.cplusplus.UninitializedObject)
+        UEXPECT_THROW(stream.Write(response), ugrpc::server::RpcInterruptedError);
+
+        return grpc::Status::OK;
     }
 };
 
@@ -64,13 +68,14 @@ namespace {
 
 class UnitTestServiceCancelEchoInf final : public sample::ugrpc::UnitTestServiceBase {
 public:
-    void Chat(ChatCall& call) override {
+    ChatResult Chat(CallContext& /*context*/, ChatReaderWriter& stream) override {
         for (;;) {
             sample::ugrpc::StreamGreetingRequest request;
-            if (!call.Read(request)) return;
+            if (!stream.Read(request)) return grpc::Status::OK;
             sample::ugrpc::StreamGreetingResponse response{};
             // NOLINTNEXTLINE(clang-analyzer-optin.cplusplus.UninitializedObject)
-            call.Write(response);
+            stream.Write(response);
+            return grpc::Status::OK;
         }
     }
 };
@@ -102,15 +107,17 @@ namespace {
 
 class UnitTestServiceCancelEchoInfWrites final : public sample::ugrpc::UnitTestServiceBase {
 public:
-    void Chat(ChatCall& call) override {
+    ChatResult Chat(CallContext& /*context*/, ChatReaderWriter& stream) override {
         sample::ugrpc::StreamGreetingRequest request;
-        EXPECT_TRUE(call.Read(request));
+        EXPECT_TRUE(stream.Read(request));
 
         sample::ugrpc::StreamGreetingResponse response{};
         for (;;) {
             // NOLINTNEXTLINE(clang-analyzer-optin.cplusplus.UninitializedObject)
-            call.Write(response);
+            stream.Write(response);
         }
+
+        return grpc::Status::OK;
     }
 };
 
@@ -145,14 +152,14 @@ namespace {
 
 class UnitTestServiceCancelEchoNoSecondWrite final : public sample::ugrpc::UnitTestServiceBase {
 public:
-    void Chat(ChatCall& call) override {
+    ChatResult Chat(CallContext& /*context*/, ChatReaderWriter& stream) override {
         sample::ugrpc::StreamGreetingRequest request;
-        EXPECT_TRUE(call.Read(request));
+        EXPECT_TRUE(stream.Read(request));
         sample::ugrpc::StreamGreetingResponse response{};
 
         // NOLINTNEXTLINE(clang-analyzer-optin.cplusplus.UninitializedObject)
-        call.Write(response);
-        call.Finish();
+        stream.Write(response);
+        return grpc::Status::OK;
     }
 };
 
@@ -177,15 +184,15 @@ namespace {
 
 class UnitTestServiceEcho final : public sample::ugrpc::UnitTestServiceBase {
 public:
-    void Chat(ChatCall& call) override {
+    ChatResult Chat(CallContext& /*context*/, ChatReaderWriter& stream) override {
         sample::ugrpc::StreamGreetingRequest request;
         sample::ugrpc::StreamGreetingResponse response;
-        while (call.Read(request)) {
+        while (stream.Read(request)) {
             response.set_name(request.name());
             response.set_number(request.number());
-            call.Write(response);
+            stream.Write(response);
         }
-        call.Finish();
+        return grpc::Status::OK;
     }
 };
 
@@ -240,16 +247,17 @@ class UnitTestServiceCancelHello final : public sample::ugrpc::UnitTestServiceBa
 public:
     UnitTestServiceCancelHello() = default;
 
-    void SayHello(SayHelloCall& call, ::sample::ugrpc::GreetingRequest&&) override {
+    SayHelloResult SayHello(CallContext& /*context*/, sample::ugrpc::GreetingRequest&& /*request*/) override {
         sample::ugrpc::GreetingResponse response;
 
         // Wait until cancelled.
         const bool success = wait_event_.WaitForEvent();
-
-        finish_event_.Send();
-        call.Finish(response);
         EXPECT_FALSE(success);
         EXPECT_TRUE(engine::current_task::ShouldCancel());
+
+        finish_event_.Send();
+
+        return response;
     }
 
     auto& GetWaitEvent() { return wait_event_; }
@@ -271,7 +279,7 @@ UTEST_F_MT(GrpcCancelByClient, CancelByClient, 3) {
     context->set_deadline(engine::Deadline::FromDuration(100ms));
     context->set_wait_for_ready(true);
     auto call = client.SayHello({}, std::move(context));
-    EXPECT_THROW(call.Finish(), ugrpc::client::BaseError);
+    UEXPECT_THROW(call.Finish(), ugrpc::client::BaseError);
 
     ASSERT_TRUE(GetService().GetFinishEvent().WaitForEventFor(std::chrono::seconds{5}));
 }
@@ -282,7 +290,7 @@ UTEST_F_MT(GrpcCancelByClient, CancelByClientNoReadyWait, 3) {
     auto context = std::make_unique<grpc::ClientContext>();
     context->set_deadline(engine::Deadline::FromDuration(100ms));
     auto call = client.SayHello({}, std::move(context));
-    EXPECT_THROW(call.Finish(), ugrpc::client::BaseError);
+    UEXPECT_THROW(call.Finish(), ugrpc::client::BaseError);
 
     ASSERT_TRUE(GetService().GetFinishEvent().WaitForEventFor(std::chrono::seconds{5}));
 }
@@ -291,10 +299,10 @@ namespace {
 
 class UnitTestServiceCancelSleep final : public sample::ugrpc::UnitTestServiceBase {
 public:
-    void SayHello(SayHelloCall& call, ::sample::ugrpc::GreetingRequest&&) override {
+    SayHelloResult SayHello(CallContext& /*context*/, sample::ugrpc::GreetingRequest&& /*request*/) override {
         engine::SleepFor(std::chrono::seconds(1));
         sample::ugrpc::GreetingResponse response{};
-        call.Finish(response);
+        return response;
     }
 };
 
@@ -326,7 +334,7 @@ namespace {
 
 class UnitTestServiceCancelError final : public sample::ugrpc::UnitTestServiceBase {
 public:
-    void Chat(ChatCall&) override {
+    ChatResult Chat(CallContext& /*context*/, ChatReaderWriter& /*stream*/) override {
         engine::SleepFor(std::chrono::milliseconds(500));
         throw std::runtime_error("Some error");
     }

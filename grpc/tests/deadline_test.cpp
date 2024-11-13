@@ -233,7 +233,7 @@ namespace {
 
 class UnitTestInheritedDeadline final : public sample::ugrpc::UnitTestServiceBase {
 public:
-    void SayHello(SayHelloCall& call, sample::ugrpc::GreetingRequest&& request) override {
+    SayHelloResult SayHello(CallContext& /*context*/, sample::ugrpc::GreetingRequest&& request) override {
         const auto& inherited_data = server::request::kTaskInheritedData.Get();
 
         EXPECT_TRUE(inherited_data.deadline.IsReachable());
@@ -250,7 +250,7 @@ public:
         sample::ugrpc::GreetingResponse response;
         response.set_name("Hello " + request.name());
 
-        call.Finish(response);
+        return response;
     }
 
     void SetClientInitialTimeout(engine::Deadline::Duration value) { initial_client_timeout_ = value; }
@@ -308,7 +308,10 @@ namespace {
 
 class UnitTestClientNotSend final : public sample::ugrpc::UnitTestServiceBase {
 public:
-    void SayHello(SayHelloCall& /*call*/, sample::ugrpc::GreetingRequest&& /*request*/) override { FAIL(); }
+    SayHelloResult SayHello(CallContext& /*context*/, sample::ugrpc::GreetingRequest&& /*request*/) override {
+        ADD_FAILURE();
+        return sample::ugrpc::GreetingResponse{};
+    }
 };
 
 class GrpcTestClientNotSendData : public ugrpc::tests::ServiceFixture<UnitTestClientNotSend> {
