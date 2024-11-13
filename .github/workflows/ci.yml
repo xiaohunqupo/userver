@@ -19,6 +19,7 @@ jobs:
             matrix:
                 include:
                   - cmake-flags: >-
+                        -GNinja
                         -DCMAKE_CXX_COMPILER=clang++-18
                         -DCMAKE_C_COMPILER=clang-18
                         -DUSERVER_SANITIZE="ub addr"
@@ -36,6 +37,7 @@ jobs:
                     ccache-dir: ~/.cache/ccache
 
                   - cmake-flags: >-
+                        -GNinja
                         -DCMAKE_CXX_COMPILER=clang++-14
                         -DCMAKE_C_COMPILER=clang-14
                         -DUSERVER_SANITIZE="ub addr"
@@ -53,6 +55,7 @@ jobs:
                     ccache-dir: ~/.cache/ccache
 
                   - cmake-flags: >-
+                        -GNinja
                         -DUSERVER_FEATURE_CRYPTOPP_BLAKE2=0
                         -DUSERVER_FEATURE_REDIS_HI_MALLOC=1
                         -DUSERVER_NO_WERROR=1
@@ -66,6 +69,7 @@ jobs:
 
                   # GCC-8 - testing minimal required compiler
                   - cmake-flags: >-
+                        -GNinja
                         -DCMAKE_CXX_COMPILER=g++-8
                         -DCMAKE_C_COMPILER=gcc-8
                         -DUSERVER_FEATURE_CRYPTOPP_BLAKE2=0
@@ -234,7 +238,7 @@ jobs:
             run: |
                 pwd
                 cd build_debug
-                make -j$(nproc)
+                cmake --build . -j $(nproc)
 
           - name: Run tests (universal)
             run: |
