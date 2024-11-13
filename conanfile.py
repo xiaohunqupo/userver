@@ -472,7 +472,9 @@ class UserverConan(ConanFile):
 
         def cyrussasl():
             return (
-                ['cyrus-sasl::cyrus-sasl'] if self.options.with_mongodb else []
+                ['cyrus-sasl::cyrus-sasl']
+                if self.options.with_mongodb or self.options.with_kafka
+                else []
             )
 
         def hiredis():
@@ -499,7 +501,6 @@ class UserverConan(ConanFile):
                 'lib': 'core',
                 'requires': (
                     ['universal']
-                    + abseil()
                     + fmt()
                     + cctz()
                     + boost()
@@ -540,7 +541,7 @@ class UserverConan(ConanFile):
                 {
                     'target': 'grpc',
                     'lib': 'grpc',
-                    'requires': (['core'] + grpc() + protobuf()),
+                    'requires': (['core'] + abseil() + grpc() + protobuf()),
                 },
                 {
                     'target': 'grpc-handlers',
@@ -608,7 +609,7 @@ class UserverConan(ConanFile):
                 {
                     'target': 'clickhouse',
                     'lib': 'clickhouse',
-                    'requires': ['core'] + clickhouse(),
+                    'requires': ['core'] + abseil() + clickhouse(),
                 },
             ])
         if self.options.with_kafka:
