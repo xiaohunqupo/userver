@@ -124,6 +124,10 @@ public:
 
     /// @brief Creates a tracing::ScopeTime attached to the Span and starts
     /// measuring execution time.
+    /// Tag `{scope_name}_time` with elapsed time is added to result span.
+    ///
+    /// @note `name` parameter is expected to satisfy snake case.
+    /// Otherwise, it is converted to snake case.
     ScopeTime CreateScopeTime(std::string name);
 
     /// Returns total time elapsed for a certain scope of this span.
