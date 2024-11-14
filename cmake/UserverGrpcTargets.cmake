@@ -48,6 +48,7 @@ function(_userver_prepare_grpc)
   set_property(GLOBAL PROPERTY userver_grpc_scripts_path "${USERVER_GRPC_SCRIPTS_PATH}")
 
   message(STATUS "Protobuf version: ${Protobuf_VERSION}")
+  message(STATUS "Protobuf compiler: ${PROTOBUF_PROTOC}")
   message(STATUS "gRPC version: ${gRPC_VERSION}")
 
   # Used by grpc/CMakeLists.txt
