@@ -123,6 +123,8 @@ struct HeartbeatsStatistics final {
     Counter success;
     Counter failed;
     Counter start;
+
+    std::optional<tracing::ScopeTime> scope;
 };
 
 // See

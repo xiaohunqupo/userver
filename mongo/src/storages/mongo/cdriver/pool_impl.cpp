@@ -170,12 +170,14 @@ void CommandFailed(const mongoc_apm_command_failed_t* event) {
 void HeartbeatStarted(const mongoc_apm_server_heartbeat_started_t* event) {
     auto& stats = GetStats(mongoc_apm_server_heartbeat_started_get_context(event));
     ++stats.apm_stats_->heartbeats.start;
+    stats.apm_stats_->heartbeats.scope.emplace("heartbeat");
     LOG_LIMITED_DEBUG() << mongoc_apm_server_heartbeat_started_get_host(event)->host_and_port << " heartbeat started";
 }
 
 void HeartbeatSuccess(const mongoc_apm_server_heartbeat_succeeded_t* event) {
     auto& stats = GetStats(mongoc_apm_server_heartbeat_succeeded_get_context(event));
     ++stats.apm_stats_->heartbeats.success;
+    stats.apm_stats_->heartbeats.scope.reset();
     LOG_LIMITED_DEBUG() << mongoc_apm_server_heartbeat_succeeded_get_host(event)->host_and_port
                         << " heartbeat succeeded";
 }
@@ -183,6 +185,7 @@ void HeartbeatSuccess(const mongoc_apm_server_heartbeat_succeeded_t* event) {
 void HeartbeatFailed(const mongoc_apm_server_heartbeat_failed_t* event) {
     auto& stats = GetStats(mongoc_apm_server_heartbeat_failed_get_context(event));
     ++stats.apm_stats_->heartbeats.failed;
+    stats.apm_stats_->heartbeats.scope.reset();
     LOG_LIMITED_WARNING() << mongoc_apm_server_heartbeat_failed_get_host(event)->host_and_port << " heartbeat failed";
 }
 
