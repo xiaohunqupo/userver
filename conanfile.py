@@ -168,6 +168,9 @@ class UserverConan(ConanFile):
         if self.options.with_kafka:
             self.requires('librdkafka/2.6.0')
 
+    def build_requirements(self):
+        self.tool_requires('protobuf/5.27.0')
+
     def validate(self):
         if self.settings.os == 'Windows':
             raise ConanInvalidConfiguration(
