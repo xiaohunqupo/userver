@@ -68,6 +68,8 @@ public:
 
     Rate GetSpuriousWakeups() const noexcept;
 
+    Rate GetRunningTasks() const noexcept;
+
     void AccountTaskCancel() noexcept;
 
     void AccountTaskCancelOverload() noexcept;
@@ -83,6 +85,10 @@ public:
     void AccountTaskSwitchSlow() noexcept;
 
     void AccountSpuriousWakeup() noexcept;
+
+    void AccountTaskIsRunning() noexcept;
+
+    void AccountTaskIsNotRunning() noexcept;
 
 private:
     // Counters that may be mutated from outside the bound TaskProcessor.
@@ -103,6 +109,7 @@ private:
         kSpuriousWakeups,
         kOverloadSensor,
         kNoOverloadSensor,
+        kRunning,
 
         kCountersSize,
     };
@@ -123,6 +130,8 @@ private:
     void Increment(LocalCounterId) noexcept;
 
     void Increment(GlobalCounterId) noexcept;
+
+    void Decrement(LocalCounterId) noexcept;
 
     GlobalCounterPack global_counters_;
     utils::FixedArray<LocalCounterPack> local_counters_;

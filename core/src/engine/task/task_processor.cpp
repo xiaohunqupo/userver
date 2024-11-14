@@ -16,6 +16,7 @@
 #include <utils/statistics/thread_statistics.hpp>
 
 #include <engine/task/counted_coroutine_ptr.hpp>
+#include <engine/task/running_token.hpp>
 #include <engine/task/task_context.hpp>
 #include <engine/task/task_processor_pools.hpp>
 
@@ -309,6 +310,7 @@ void TaskProcessor::ProcessTasks() noexcept {
 
         bool has_failed = false;
         try {
+            RunningTaskToken token{GetTaskCounter()};
             context->DoStep();
         } catch (const std::exception& ex) {
             LOG_ERROR() << "uncaught exception from DoStep: " << ex;

@@ -87,6 +87,8 @@ Rate TaskCounter::GetTaskSwitchSlow() const noexcept { return GetApproximate(Loc
 
 Rate TaskCounter::GetSpuriousWakeups() const noexcept { return GetApproximate(LocalCounterId::kSpuriousWakeups); }
 
+Rate TaskCounter::GetRunningTasks() const noexcept { return GetApproximate(LocalCounterId::kRunning); }
+
 void TaskCounter::AccountTaskCancel() noexcept { Increment(LocalCounterId::kCancelled); }
 
 void TaskCounter::AccountTaskCancelOverload() noexcept { Increment(GlobalCounterId::kCancelOverload); }
@@ -102,6 +104,10 @@ void TaskCounter::AccountTaskSwitchFast() noexcept { Increment(LocalCounterId::k
 void TaskCounter::AccountTaskSwitchSlow() noexcept { Increment(LocalCounterId::kSwitchSlow); }
 
 void TaskCounter::AccountSpuriousWakeup() noexcept { Increment(LocalCounterId::kSpuriousWakeups); }
+
+void TaskCounter::AccountTaskIsRunning() noexcept { Increment(LocalCounterId::kRunning); }
+
+void TaskCounter::AccountTaskIsNotRunning() noexcept { Decrement(LocalCounterId::kRunning); }
 
 Rate TaskCounter::GetApproximate(LocalCounterId id) const noexcept {
     Rate total;
@@ -121,6 +127,13 @@ void TaskCounter::Increment(LocalCounterId id) noexcept {
     UASSERT(local_data->local_counter == this);
     auto& counter = (*local_counters_[local_data->task_processor_thread_index])[static_cast<std::size_t>(id)];
     counter.Store(counter.Load() + Rate{1});
+}
+
+void TaskCounter::Decrement(LocalCounterId id) noexcept {
+    auto local_data = local_task_counter_data.Use();
+    UASSERT(local_data->local_counter == this);
+    auto& counter = (*local_counters_[local_data->task_processor_thread_index])[static_cast<std::size_t>(id)];
+    counter.Store(counter.Load() - Rate{1});
 }
 
 void TaskCounter::Increment(GlobalCounterId id) noexcept { global_counters_[static_cast<std::size_t>(id)].Add(1); }

@@ -1308,6 +1308,7 @@
   "core/src/engine/task/exception_hacks.hpp":"taxi/uservices/userver/core/src/engine/task/exception_hacks.hpp",
   "core/src/engine/task/inherited_variable_test.cpp":"taxi/uservices/userver/core/src/engine/task/inherited_variable_test.cpp",
   "core/src/engine/task/local_variable_test.cpp":"taxi/uservices/userver/core/src/engine/task/local_variable_test.cpp",
+  "core/src/engine/task/running_token.hpp":"taxi/uservices/userver/core/src/engine/task/running_token.hpp",
   "core/src/engine/task/shared_task.cpp":"taxi/uservices/userver/core/src/engine/task/shared_task.cpp",
   "core/src/engine/task/shared_task_with_result_test.cpp":"taxi/uservices/userver/core/src/engine/task/shared_task_with_result_test.cpp",
   "core/src/engine/task/single_threaded_task_processors_pool.cpp":"taxi/uservices/userver/core/src/engine/task/single_threaded_task_processors_pool.cpp",
