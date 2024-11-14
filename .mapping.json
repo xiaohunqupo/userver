@@ -395,7 +395,6 @@
   "cmake/modules/FindBrotli.cmake":"taxi/uservices/userver/cmake/modules/FindBrotli.cmake",
   "cmake/modules/FindCrypto.cmake":"taxi/uservices/userver/cmake/modules/FindCrypto.cmake",
   "cmake/modules/FindCryptoPP.cmake":"taxi/uservices/userver/cmake/modules/FindCryptoPP.cmake",
-  "cmake/modules/FindGit.cmake":"taxi/uservices/userver/cmake/modules/FindGit.cmake",
   "cmake/modules/FindGrpcChannelz.cmake":"taxi/uservices/userver/cmake/modules/FindGrpcChannelz.cmake",
   "cmake/modules/FindGssApi.cmake":"taxi/uservices/userver/cmake/modules/FindGssApi.cmake",
   "cmake/modules/FindHiredis.cmake":"taxi/uservices/userver/cmake/modules/FindHiredis.cmake",

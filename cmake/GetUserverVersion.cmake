@@ -6,7 +6,7 @@ find_package(Git)
 
 if(Git_FOUND)
   execute_process(
-    COMMAND ${Git_EXECUTABLE} rev-parse --short HEAD
+    COMMAND ${GIT_EXECUTABLE} rev-parse --short HEAD
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
     OUTPUT_VARIABLE USERVER_HASH
     RESULT_VARIABLE STATUS
