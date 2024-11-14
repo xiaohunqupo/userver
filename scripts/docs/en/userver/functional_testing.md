@@ -34,11 +34,6 @@ Its main purpose is:
 * Add a `start-*` target that starts the service and databases with testsuite
   configs and waits for keyboard interruption to stop the service.
 
-@ref cmake/UserverTestsuite.cmake library is automatically added to CMake path
-after userver environment setup. Add the following line to use it:
-
-@snippet testsuite/SetupUserverTestsuiteEnv.cmake testsuite - UserverTestsuite
-
 Then create testsuite target:
 @snippet samples/testsuite-support/CMakeLists.txt testsuite - cmake
 
