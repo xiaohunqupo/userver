@@ -8,6 +8,8 @@ components_manager:
 
     default_task_processor: main-task-processor
 
+    graceful_shutdown_interval: 10s
+
     components:
         logging:
             fs-task-processor: fs-task-processor
