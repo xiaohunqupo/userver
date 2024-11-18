@@ -642,12 +642,7 @@ class UserverConan(ConanFile):
         return userver_components
 
     def package_info(self):
-        debug = (
-            'd'
-            if self.settings.build_type == 'Debug'
-            and self.settings.os == 'Windows'
-            else ''
-        )
+        debug = 'd' if self.settings.build_type == 'Debug' else ''
 
         def get_lib_name(module):
             return f'userver-{module}{debug}'
