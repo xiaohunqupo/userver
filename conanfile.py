@@ -191,7 +191,6 @@ class UserverConan(ConanFile):
         tool_ch.variables['CMAKE_FIND_DEBUG_MODE'] = False
 
         tool_ch.variables['USERVER_CONAN'] = True
-        tool_ch.variables['USERVER_IS_THE_ROOT_PROJECT'] = False
         tool_ch.variables['USERVER_DOWNLOAD_PACKAGES'] = True
         tool_ch.variables['USERVER_FEATURE_DWCAS'] = True
         tool_ch.variables['USERVER_NAMESPACE'] = self.options.namespace
