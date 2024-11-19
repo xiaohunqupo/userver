@@ -38,7 +38,6 @@ public:
     int GetHttpMinor() const { return http_minor_; }
     const std::string& GetUrl() const { return url_; }
     const std::string& GetRequestPath() const override { return request_path_; }
-    const std::string& GetPathSuffix() const { return path_suffix_; }
     std::chrono::duration<double> GetRequestTime() const;
     std::chrono::duration<double> GetResponseTime() const;
 
@@ -117,8 +116,6 @@ public:
 
     void SetPathArgs(std::vector<std::pair<std::string, std::string>> args);
 
-    void SetMatchedPathLength(size_t length) override;
-
     void AccountResponseTime() override;
 
     void MarkAsInternalServerError() const override;
@@ -135,7 +132,7 @@ public:
     void SetResponseStreamId(std::int32_t);
     void SetStreamProducer(impl::Http2StreamEventProducer&& producer);
 
-    friend class HttpRequestConstructor;
+    friend class HttpRequestImplBuilder;
 
 private:
     HttpMethod method_{HttpMethod::kUnknown};

@@ -10,6 +10,7 @@
 
 #include "handler_info_index.hpp"
 #include "http_request_impl.hpp"
+#include "http_request_impl_builder.hpp"
 
 USERVER_NAMESPACE_BEGIN
 
@@ -71,14 +72,13 @@ private:
     void ParseArgs(const HttpParserUrl& url);
     void ParseArgs(const char* data, size_t size);
     void AddHeader();
-    void ParseCookies();
 
     void SetStatus(Status status);
     void AccountRequestSize(size_t size);
     void AccountUrlSize(size_t size);
     void AccountHeadersSize(size_t size);
 
-    void CheckStatus() const;
+    void CheckStatus();
 
     Config config_;
     const HandlerInfoIndex& handler_info_index_;
@@ -95,7 +95,9 @@ private:
     bool url_parsed_ = false;
     Status status_ = Status::kOk;
 
-    std::shared_ptr<HttpRequestImpl> request_;
+    std::string url_;
+    std::string body_;
+    HttpRequestImplBuilder builder_;
 };
 
 }  // namespace server::http

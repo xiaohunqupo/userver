@@ -1517,6 +1517,8 @@
   "core/src/server/http/http_request_headers_benchmark.cpp":"taxi/uservices/userver/core/src/server/http/http_request_headers_benchmark.cpp",
   "core/src/server/http/http_request_impl.cpp":"taxi/uservices/userver/core/src/server/http/http_request_impl.cpp",
   "core/src/server/http/http_request_impl.hpp":"taxi/uservices/userver/core/src/server/http/http_request_impl.hpp",
+  "core/src/server/http/http_request_impl_builder.cpp":"taxi/uservices/userver/core/src/server/http/http_request_impl_builder.cpp",
+  "core/src/server/http/http_request_impl_builder.hpp":"taxi/uservices/userver/core/src/server/http/http_request_impl_builder.hpp",
   "core/src/server/http/http_request_method_test.cpp":"taxi/uservices/userver/core/src/server/http/http_request_method_test.cpp",
   "core/src/server/http/http_request_parser.cpp":"taxi/uservices/userver/core/src/server/http/http_request_parser.cpp",
   "core/src/server/http/http_request_parser.hpp":"taxi/uservices/userver/core/src/server/http/http_request_parser.hpp",

@@ -25,8 +25,6 @@ const std::string& HttpRequest::GetUrl() const { return impl_.GetUrl(); }
 
 const std::string& HttpRequest::GetRequestPath() const { return impl_.GetRequestPath(); }
 
-const std::string& HttpRequest::GetPathSuffix() const { return impl_.GetPathSuffix(); }
-
 std::chrono::duration<double> HttpRequest::GetRequestTime() const { return impl_.GetRequestTime(); }
 
 std::chrono::duration<double> HttpRequest::GetResponseTime() const { return impl_.GetResponseTime(); }

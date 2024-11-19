@@ -44,8 +44,6 @@ public:
     void SetStartSendResponseTime();
     void SetFinishSendResponseTime();
 
-    virtual void SetMatchedPathLength(size_t length) = 0;
-
     std::chrono::steady_clock::time_point StartTime() const { return start_time_; }
 
     virtual void MarkAsInternalServerError() const = 0;

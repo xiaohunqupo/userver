@@ -71,10 +71,6 @@ public:
     /// @return Request path
     const std::string& GetRequestPath() const;
 
-    /// @return Request path suffix, i.e. part of the path that remains after
-    /// matching the path of a handler.
-    const std::string& GetPathSuffix() const;
-
     std::chrono::duration<double> GetRequestTime() const;
     std::chrono::duration<double> GetResponseTime() const;
 

@@ -257,8 +257,6 @@ void HttpRequestImpl::SetPathArgs(std::vector<std::pair<std::string, std::string
     }
 }
 
-void HttpRequestImpl::SetMatchedPathLength(size_t length) { path_suffix_ = request_path_.substr(length); }
-
 void HttpRequestImpl::AccountResponseTime() {
     UASSERT(request_statistics_);
     auto timing = std::chrono::duration_cast<std::chrono::milliseconds>(finish_send_response_time_ - start_time_);
