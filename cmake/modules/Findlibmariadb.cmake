@@ -1,10 +1,3 @@
-option(USERVER_MYSQL_OLD_INCLUDE "If yes, uses old mysql/mysql.h instead of mariadb/mysql.h" OFF)
-if(USERVER_MYSQL_OLD_INCLUDE)
-  set(MYSQL_H mysql/mysql.h)
-else()
-  set(MYSQL_H mariadb/mysql.h)
-endif()
-
 _userver_module_begin(
     NAME libmariadb
     VERSION 3.0.3
@@ -12,7 +5,7 @@ _userver_module_begin(
 )
 
 _userver_module_find_include(
-    NAMES ${MYSQL_H}
+    NAMES mysql/mysql.h mariadb/mysql.h
 )
 
 _userver_module_find_library(
@@ -21,3 +14,8 @@ _userver_module_find_library(
 )
 
 _userver_module_end()
+
+find_path(MYSQL_H NAMES mariadb/mysql.h)
+if (MYSQL_H STREQUAL "MYSQL_H-NOTFOUND")
+  set(USERVER_MYSQL_OLD_INCLUDE YES)
+endif()
