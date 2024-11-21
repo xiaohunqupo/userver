@@ -4,19 +4,17 @@
 
 #include <userver/http/parser/http_request_parse_args.hpp>
 #include <userver/server/http/http_method.hpp>
+#include <userver/server/http/http_request.hpp>
+#include <userver/server/http/http_request_builder.hpp>
 #include <userver/server/request/request_config.hpp>
 
-#include <server/request/request_constructor.hpp>
-
 #include "handler_info_index.hpp"
-#include "http_request_impl.hpp"
-#include "http_request_impl_builder.hpp"
 
 USERVER_NAMESPACE_BEGIN
 
 namespace server::http {
 
-class HttpRequestConstructor final : public request::RequestConstructor {
+class HttpRequestConstructor final {
 public:
     enum class Status {
         kOk,
@@ -41,7 +39,7 @@ public:
         engine::io::Sockaddr remote_address
     );
 
-    ~HttpRequestConstructor() override;
+    ~HttpRequestConstructor();
 
     HttpRequestConstructor(HttpRequestConstructor&&) = delete;
     HttpRequestConstructor& operator=(HttpRequestConstructor&&) = delete;
@@ -62,7 +60,7 @@ public:
     void SetStreamProducer(impl::Http2StreamEventProducer&& producer);
     void SetResponseStreamId(std::int32_t stream_id);
 
-    std::shared_ptr<request::RequestBase> Finalize() override;
+    std::shared_ptr<http::HttpRequest> Finalize();
 
 private:
     struct HttpParserUrl;
@@ -97,7 +95,7 @@ private:
 
     std::string url_;
     std::string body_;
-    HttpRequestImplBuilder builder_;
+    HttpRequestBuilder builder_;
 };
 
 }  // namespace server::http

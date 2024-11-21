@@ -48,7 +48,9 @@ HttpRequestConstructor::HttpRequestConstructor(
     request::ResponseDataAccounter& data_accounter,
     engine::io::Sockaddr remote_address
 )
-    : config_(config), handler_info_index_(handler_info_index), builder_(data_accounter, std::move(remote_address)) {}
+    : config_(config), handler_info_index_(handler_info_index), builder_(data_accounter) {
+    builder_.SetRemoteAddress(std::move(remote_address));
+}
 
 HttpRequestConstructor::~HttpRequestConstructor() = default;
 
@@ -167,7 +169,7 @@ void HttpRequestConstructor::SetStreamProducer(impl::Http2StreamEventProducer&& 
     builder_.SetStreamProducer(std::move(producer));
 }
 
-std::shared_ptr<request::RequestBase> HttpRequestConstructor::Finalize() {
+std::shared_ptr<http::HttpRequest> HttpRequestConstructor::Finalize() {
     FinalizeImpl();
 
     CheckStatus();
