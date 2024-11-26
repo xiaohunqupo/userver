@@ -467,6 +467,11 @@ properties:
       minimum: 0
       description: maximum allowed replication lag. If equals 0 no replication 
       lag checks are performed
+    disabled_replicas:
+      type: array
+      description: List of manually disabled replicas (FQDNs).
+      items:
+        type: string
 required:
   - max_replication_lag_ms
 ```
@@ -475,7 +480,8 @@ required:
 ```json
 {
   "__default__": {
-    "max_replication_lag_ms": 60000
+    "max_replication_lag_ms": 60000,
+    "disabled_replicas": ["replica-01.example.com", "replica-02.example.com"]
   }
 }
 ```
