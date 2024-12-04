@@ -134,7 +134,7 @@ service from a template.
 
 #### Migration of configs from the easy library to a service template
 
-To get the up to date static configs from a easy library, just build the binary and run it with `--dump-config` and
+To get the up to date static configs from the easy library, just build the service and run it with `--dump-config` and
 the binary will output the config to `STDOUT`. You can also provide a path to dump the static config, for example
 `./your_prototype --dump-config pg_service_template_based_service/configs/static_config.yaml`.
 
@@ -144,8 +144,8 @@ If there's any `userver_testsuite_add_simple(DUMP_CONFIG True)` in a `CMakeLists
 
 #### Migration of database schema from the easy library to a service template
 
-To get the up to database schemas from an easy library, just build the binary and run it with `--dump-db-schema` and the
-binary will output the database schema to `STDOUT`. You can also provide a path to dump the schema, for example
+To get the up to date database schemas from an easy library, just build the binary and run it with `--dump-db-schema`
+and the binary will output the database schema to `STDOUT`. You can also provide a path to dump the schema, for example
 `./your_prototype --dump-db-schema pg_service_template_based_service/postgresql/schemas/db_1.sql`.
 
 Another option is to take the schema from easy::HttpWith::DbSchema(). In any case, do not forget to remove the
