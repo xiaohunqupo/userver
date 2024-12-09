@@ -86,7 +86,7 @@ engine::FutureStatus UnaryFuture::WaitUntil(engine::Deadline deadline) const {
     const auto wait_status = impl::WaitUntil(finish, data_->GetContext(), deadline);
     switch (wait_status) {
         case impl::AsyncMethodInvocation::WaitStatus::kOk:
-            if (data_->NeedProcessFinish()) {
+            if (!data_->GetAndSetFinishProcessed()) {
                 const auto& status = finish.GetStatus();
 
                 data_->GetStatsScope().OnExplicitFinish(status.error_code());

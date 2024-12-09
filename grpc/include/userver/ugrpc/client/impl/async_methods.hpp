@@ -119,7 +119,7 @@ public:
     // we use two different invocation types
     FinishAsyncMethodInvocation& GetFinishAsyncMethodInvocation() noexcept;
 
-    bool NeedProcessFinish() noexcept;
+    bool GetAndSetFinishProcessed() noexcept;
 
     // This are for asserts and invariants. Do NOT branch actual code
     // based on these two functions. Branching based on these two functions
@@ -168,7 +168,7 @@ private:
     // Read* call, because we don't need to close span and/or account stats
     // when finishing Read* call.
     std::variant<std::monostate, AsyncMethodInvocation, FinishAsyncMethodInvocation> invocation_;
-    bool need_process_finish_{true};
+    bool finish_processed_{false};
 
     grpc::Status status_;
 };

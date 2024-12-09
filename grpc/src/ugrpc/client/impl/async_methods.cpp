@@ -215,7 +215,7 @@ FinishAsyncMethodInvocation& RpcData::GetFinishAsyncMethodInvocation() noexcept 
     return std::get<FinishAsyncMethodInvocation>(invocation_);
 }
 
-bool RpcData::NeedProcessFinish() noexcept { return std::exchange(need_process_finish_, false); }
+bool RpcData::GetAndSetFinishProcessed() noexcept { return std::exchange(finish_processed_, true); }
 
 bool RpcData::HoldsAsyncMethodInvocationDebug() noexcept {
     return std::holds_alternative<AsyncMethodInvocation>(invocation_);
