@@ -2146,6 +2146,7 @@
   "kafka/include/userver/kafka/impl/holders.hpp":"taxi/uservices/userver/kafka/include/userver/kafka/impl/holders.hpp",
   "kafka/include/userver/kafka/impl/stats.hpp":"taxi/uservices/userver/kafka/include/userver/kafka/impl/stats.hpp",
   "kafka/include/userver/kafka/message.hpp":"taxi/uservices/userver/kafka/include/userver/kafka/message.hpp",
+  "kafka/include/userver/kafka/offset_range.hpp":"taxi/uservices/userver/kafka/include/userver/kafka/offset_range.hpp",
   "kafka/include/userver/kafka/producer.hpp":"taxi/uservices/userver/kafka/include/userver/kafka/producer.hpp",
   "kafka/include/userver/kafka/producer_component.hpp":"taxi/uservices/userver/kafka/include/userver/kafka/producer_component.hpp",
   "kafka/library.yaml":"taxi/uservices/userver/kafka/library.yaml",
