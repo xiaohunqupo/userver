@@ -1946,6 +1946,7 @@
   "grpc/include/userver/ugrpc/client/middlewares/fwd.hpp":"taxi/uservices/userver/grpc/include/userver/ugrpc/client/middlewares/fwd.hpp",
   "grpc/include/userver/ugrpc/client/middlewares/log/component.hpp":"taxi/uservices/userver/grpc/include/userver/ugrpc/client/middlewares/log/component.hpp",
   "grpc/include/userver/ugrpc/client/qos.hpp":"taxi/uservices/userver/grpc/include/userver/ugrpc/client/qos.hpp",
+  "grpc/include/userver/ugrpc/client/response_future.hpp":"taxi/uservices/userver/grpc/include/userver/ugrpc/client/response_future.hpp",
   "grpc/include/userver/ugrpc/client/rpc.hpp":"taxi/uservices/userver/grpc/include/userver/ugrpc/client/rpc.hpp",
   "grpc/include/userver/ugrpc/client/simple_client_component.hpp":"taxi/uservices/userver/grpc/include/userver/ugrpc/client/simple_client_component.hpp",
   "grpc/include/userver/ugrpc/field_mask.hpp":"taxi/uservices/userver/grpc/include/userver/ugrpc/field_mask.hpp",
