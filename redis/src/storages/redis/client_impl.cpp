@@ -988,7 +988,7 @@ RequestZrange ClientImpl::Zrange(std::string key, int64_t start, int64_t stop, c
 RequestZrangeWithScores
 ClientImpl::ZrangeWithScores(std::string key, int64_t start, int64_t stop, const CommandControl& command_control) {
     auto shard = ShardByKey(key, command_control);
-    USERVER_NAMESPACE::redis::ScoreOptions with_scores{true};
+    ScoreOptions with_scores{true};
     return CreateRequest<RequestZrangeWithScores>(MakeRequest(
         CmdArgs{"zrange", std::move(key), start, stop, with_scores}, shard, false, GetCommandControl(command_control)
     ));
@@ -1021,7 +1021,7 @@ RequestZrangebyscore ClientImpl::Zrangebyscore(
     const CommandControl& command_control
 ) {
     auto shard = ShardByKey(key, command_control);
-    USERVER_NAMESPACE::redis::RangeScoreOptions range_score_options{{false}, range_options};
+    RangeScoreOptions range_score_options{{false}, range_options};
     return CreateRequest<RequestZrangebyscore>(MakeRequest(
         CmdArgs{"zrangebyscore", std::move(key), min, max, range_score_options},
         shard,
@@ -1038,7 +1038,7 @@ RequestZrangebyscore ClientImpl::Zrangebyscore(
     const CommandControl& command_control
 ) {
     auto shard = ShardByKey(key, command_control);
-    USERVER_NAMESPACE::redis::RangeScoreOptions range_score_options{{false}, range_options};
+    RangeScoreOptions range_score_options{{false}, range_options};
     return CreateRequest<RequestZrangebyscore>(MakeRequest(
         CmdArgs{"zrangebyscore", std::move(key), std::move(min), std::move(max), range_score_options},
         shard,
@@ -1050,7 +1050,7 @@ RequestZrangebyscore ClientImpl::Zrangebyscore(
 RequestZrangebyscoreWithScores
 ClientImpl::ZrangebyscoreWithScores(std::string key, double min, double max, const CommandControl& command_control) {
     auto shard = ShardByKey(key, command_control);
-    USERVER_NAMESPACE::redis::RangeScoreOptions range_score_options{{true}, {}};
+    RangeScoreOptions range_score_options{{true}, {}};
     return CreateRequest<RequestZrangebyscoreWithScores>(MakeRequest(
         CmdArgs{"zrangebyscore", std::move(key), min, max, range_score_options},
         shard,
@@ -1066,7 +1066,7 @@ RequestZrangebyscoreWithScores ClientImpl::ZrangebyscoreWithScores(
     const CommandControl& command_control
 ) {
     auto shard = ShardByKey(key, command_control);
-    USERVER_NAMESPACE::redis::RangeScoreOptions range_score_options{{true}, {}};
+    RangeScoreOptions range_score_options{{true}, {}};
     return CreateRequest<RequestZrangebyscoreWithScores>(MakeRequest(
         CmdArgs{"zrangebyscore", std::move(key), std::move(min), std::move(max), range_score_options},
         shard,
@@ -1083,7 +1083,7 @@ RequestZrangebyscoreWithScores ClientImpl::ZrangebyscoreWithScores(
     const CommandControl& command_control
 ) {
     auto shard = ShardByKey(key, command_control);
-    USERVER_NAMESPACE::redis::RangeScoreOptions range_score_options{{true}, range_options};
+    RangeScoreOptions range_score_options{{true}, range_options};
     return CreateRequest<RequestZrangebyscoreWithScores>(MakeRequest(
         CmdArgs{"zrangebyscore", std::move(key), min, max, range_score_options},
         shard,
@@ -1100,7 +1100,7 @@ RequestZrangebyscoreWithScores ClientImpl::ZrangebyscoreWithScores(
     const CommandControl& command_control
 ) {
     auto shard = ShardByKey(key, command_control);
-    USERVER_NAMESPACE::redis::RangeScoreOptions range_score_options{{true}, range_options};
+    RangeScoreOptions range_score_options{{true}, range_options};
     return CreateRequest<RequestZrangebyscoreWithScores>(MakeRequest(
         CmdArgs{"zrangebyscore", std::move(key), std::move(min), std::move(max), range_score_options},
         shard,

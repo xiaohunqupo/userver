@@ -9,8 +9,8 @@
 #include <memory>
 #include <string>
 
+#include <userver/storages/redis/command_options.hpp>
 #include <userver/storages/redis/impl/base.hpp>
-#include <userver/storages/redis/impl/command_options.hpp>
 
 #include <userver/storages/redis/client.hpp>
 #include <userver/storages/redis/mock_request.hpp>

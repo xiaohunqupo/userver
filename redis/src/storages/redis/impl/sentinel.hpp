@@ -10,8 +10,8 @@
 #include <userver/utils/retry_budget.hpp>
 #include <userver/utils/swappingsmart.hpp>
 
+#include <userver/storages/redis/command_options.hpp>
 #include <userver/storages/redis/impl/base.hpp>
-#include <userver/storages/redis/impl/command_options.hpp>
 #include <userver/storages/redis/impl/keyshard.hpp>
 #include <userver/storages/redis/impl/request.hpp>
 #include <userver/storages/redis/impl/secdist_redis.hpp>

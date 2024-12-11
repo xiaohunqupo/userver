@@ -6,8 +6,8 @@
 #include <string>
 #include <vector>
 
+#include <userver/storages/redis/command_options.hpp>
 #include <userver/storages/redis/impl/base.hpp>
-#include <userver/storages/redis/impl/command_options.hpp>
 #include <userver/storages/redis/impl/request.hpp>
 
 #include <userver/storages/redis/client.hpp>

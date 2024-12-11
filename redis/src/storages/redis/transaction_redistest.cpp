@@ -122,10 +122,10 @@ UTEST_F(RedisClientTransactionTest, Geosearch) {
     options.withhash = true;
     options.withcoord = true;
 
-    const auto lon = redis::Longitude(15);
-    const auto lat = redis::Latitude(37);
-    const auto width = redis::BoxWidth(200);
-    const auto height = redis::BoxHeight(200);
+    const auto lon = storages::redis::Longitude(15);
+    const auto lat = storages::redis::Latitude(37);
+    const auto width = storages::redis::BoxWidth(200);
+    const auto height = storages::redis::BoxHeight(200);
 
     // FROMLONLAT BYRADIUS
     auto result = Get(client->Geosearch("Sicily", lon, lat, 100, options));
@@ -236,8 +236,8 @@ UTEST_F(RedisClientTransactionTest, Georadius) {
     options.withhash = true;
     options.withcoord = true;
 
-    const auto lon = redis::Longitude(15);
-    const auto lat = redis::Latitude(37);
+    const auto lon = storages::redis::Longitude(15);
+    const auto lat = storages::redis::Latitude(37);
 
     auto result = Get(client->Georadius("Sicily", lon, lat, 200, options));
     EXPECT_EQ(result.size(), 2);

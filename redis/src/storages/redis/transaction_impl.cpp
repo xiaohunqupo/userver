@@ -554,7 +554,7 @@ RequestZrange TransactionImpl::Zrange(std::string key, int64_t start, int64_t st
 
 RequestZrangeWithScores TransactionImpl::ZrangeWithScores(std::string key, int64_t start, int64_t stop) {
     UpdateShard(key);
-    USERVER_NAMESPACE::redis::ScoreOptions with_scores{true};
+    ScoreOptions with_scores{true};
     return AddCmd<RequestZrangeWithScores>("zrange", false, std::move(key), start, stop, with_scores);
 }
 
@@ -584,7 +584,7 @@ TransactionImpl::Zrangebyscore(std::string key, std::string min, std::string max
 
 RequestZrangebyscoreWithScores TransactionImpl::ZrangebyscoreWithScores(std::string key, double min, double max) {
     UpdateShard(key);
-    USERVER_NAMESPACE::redis::RangeScoreOptions range_score_options{{true}, {}};
+    RangeScoreOptions range_score_options{{true}, {}};
     return AddCmd<RequestZrangebyscoreWithScores>(
         "zrangebyscore", false, std::move(key), min, max, range_score_options
     );
@@ -593,7 +593,7 @@ RequestZrangebyscoreWithScores TransactionImpl::ZrangebyscoreWithScores(std::str
 RequestZrangebyscoreWithScores
 TransactionImpl::ZrangebyscoreWithScores(std::string key, std::string min, std::string max) {
     UpdateShard(key);
-    USERVER_NAMESPACE::redis::RangeScoreOptions range_score_options{{true}, {}};
+    RangeScoreOptions range_score_options{{true}, {}};
     return AddCmd<RequestZrangebyscoreWithScores>(
         "zrangebyscore", false, std::move(key), std::move(min), std::move(max), range_score_options
     );
@@ -602,7 +602,7 @@ TransactionImpl::ZrangebyscoreWithScores(std::string key, std::string min, std::
 RequestZrangebyscoreWithScores
 TransactionImpl::ZrangebyscoreWithScores(std::string key, double min, double max, const RangeOptions& range_options) {
     UpdateShard(key);
-    USERVER_NAMESPACE::redis::RangeScoreOptions range_score_options{{true}, range_options};
+    RangeScoreOptions range_score_options{{true}, range_options};
     return AddCmd<RequestZrangebyscoreWithScores>(
         "zrangebyscore", false, std::move(key), min, max, range_score_options
     );
@@ -615,7 +615,7 @@ RequestZrangebyscoreWithScores TransactionImpl::ZrangebyscoreWithScores(
     const RangeOptions& range_options
 ) {
     UpdateShard(key);
-    USERVER_NAMESPACE::redis::RangeScoreOptions range_score_options{{true}, range_options};
+    RangeScoreOptions range_score_options{{true}, range_options};
     return AddCmd<RequestZrangebyscoreWithScores>(
         "zrangebyscore", false, std::move(key), std::move(min), std::move(max), range_score_options
     );
@@ -677,7 +677,7 @@ void TransactionImpl::UpdateShard(size_t shard) {
     if (shard_) {
         if (check_shards_ == CheckShards::kSame && *shard_ != shard) {
             std::ostringstream os;
-            os << "Storages::redis::Transaction must deal with the same shard across "
+            os << "storages::redis::Transaction must deal with the same shard across "
                   "all the operations. Shard="
                << *shard_
                << " was detected by first command, but one of the commands used "

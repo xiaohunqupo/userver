@@ -31,19 +31,13 @@ Request<ScanReplyTmpl<scan_tag>> MakeScanRequest(
     ScanOptionsTmpl<scan_tag> options,
     const CommandControl& command_control
 ) {
-    return client.MakeScanRequestWithKey<scan_tag>(std::move(key), shard, cursor, std::move(options), command_control);
-}
-
-template <>
-inline Request<ScanReply> MakeScanRequest<ScanTag::kScan>(
-    ClientImpl& client,
-    std::string,
-    size_t shard,
-    ScanReply::Cursor cursor,
-    ScanOptions options,
-    const CommandControl& command_control
-) {
-    return client.MakeScanRequestNoKey(shard, cursor, std::move(options), command_control);
+    if constexpr (scan_tag == ScanTag::kScan) {
+        return client.MakeScanRequestNoKey(shard, cursor, std::move(options), command_control);
+    } else {
+        return client.MakeScanRequestWithKey<scan_tag>(
+            std::move(key), shard, cursor, std::move(options), command_control
+        );
+    }
 }
 
 }  // namespace impl
