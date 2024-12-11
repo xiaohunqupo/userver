@@ -29,7 +29,6 @@ Plugin::Plugin() : http::Plugin(kName) {}
 void Plugin::HookPerformRequest(PluginRequest&) {}
 
 void Plugin::HookCreateSpan(PluginRequest&, tracing::Span& span) {
-    span.AddNonInheritableTag(kTypeTag, kTypeRequest);
     span.AddNonInheritableTag(tracing::kSpanKind, tracing::kSpanKindClient);
 }
 
