@@ -148,9 +148,9 @@ private:
     engine::Semaphore in_use_semaphore_;
     engine::Semaphore connecting_semaphore_;
     const PoolConfig pool_config_;
-    moodycamel::ConcurrentQueue<ConnPtr> queue_;
-    // ApmStats must be after the queue_
     stats::ApmStats apm_stats_;
+    // queue_ must be after the apm_stats_, so apm_stats_ is used in connections
+    moodycamel::ConcurrentQueue<ConnPtr> queue_;
     utils::PeriodicTask maintenance_task_;
 };
 
