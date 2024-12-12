@@ -3660,6 +3660,7 @@
   "scripts/grpc/templates/service.usrv.hpp.jinja":"taxi/uservices/userver/scripts/grpc/templates/service.usrv.hpp.jinja",
   "scripts/grpc/templates/utils.inc.jinja":"taxi/uservices/userver/scripts/grpc/templates/utils.inc.jinja",
   "scripts/human_logs.py":"taxi/uservices/userver/scripts/human_logs.py",
+  "scripts/migrate_from_legacy_redis_ns.sh":"taxi/uservices/userver/scripts/migrate_from_legacy_redis_ns.sh",
   "scripts/perf-blocking-syscall":"taxi/uservices/userver/scripts/perf-blocking-syscall",
   "scripts/postgres/pg_sql_codes.py":"taxi/uservices/userver/scripts/postgres/pg_sql_codes.py",
   "scripts/rabbitmq/ubuntu_install_rabbitmq_server.sh":"taxi/uservices/userver/scripts/rabbitmq/ubuntu_install_rabbitmq_server.sh",
