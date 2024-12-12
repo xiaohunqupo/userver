@@ -12,10 +12,7 @@ USERVER_NAMESPACE_BEGIN
 namespace storages::redis {
 namespace {
 
-RequestExec CreateExecRequest(
-    USERVER_NAMESPACE::redis::Request&& request,
-    std::vector<TransactionImpl::ResultPromise>&& result_promises
-) {
+RequestExec CreateExecRequest(impl::Request&& request, std::vector<TransactionImpl::ResultPromise>&& result_promises) {
     return RequestExec(std::make_unique<RequestExecDataImpl>(std::move(request), std::move(result_promises)));
 }
 
@@ -32,7 +29,7 @@ RequestExec TransactionImpl::Exec(const CommandControl& command_control) {
     const auto client_force_shard_idx = client_->GetForcedShardIdx();
     if (client_force_shard_idx) {
         if (command_control.force_shard_idx && *command_control.force_shard_idx != *client_force_shard_idx)
-            throw USERVER_NAMESPACE::redis::InvalidArgumentException(
+            throw InvalidArgumentException(
                 "forced shard idx from CommandControl != forced shard for client (" +
                 std::to_string(*command_control.force_shard_idx) + " != " + std::to_string(*client_force_shard_idx) +
                 ')'
@@ -656,8 +653,8 @@ RequestZscore TransactionImpl::Zscore(std::string key, std::string member) {
 void TransactionImpl::UpdateShard(const std::string& key) {
     try {
         UpdateShard(client_->ShardByKey(key));
-    } catch (const USERVER_NAMESPACE::redis::InvalidArgumentException& ex) {
-        throw USERVER_NAMESPACE::redis::InvalidArgumentException(ex.what() + std::string{" for key=" + key});
+    } catch (const InvalidArgumentException& ex) {
+        throw InvalidArgumentException(ex.what() + std::string{" for key=" + key});
     }
 }
 
@@ -683,7 +680,7 @@ void TransactionImpl::UpdateShard(size_t shard) {
                << " was detected by first command, but one of the commands used "
                   "shard="
                << shard;
-            throw USERVER_NAMESPACE::redis::InvalidArgumentException(os.str());
+            throw InvalidArgumentException(os.str());
         }
     } else {
         shard_ = shard;

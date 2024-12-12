@@ -3,7 +3,7 @@
 #include <memory>
 #include <string>
 
-#include <userver/storages/redis/impl/base.hpp>
+#include <userver/storages/redis/base.hpp>
 #include <userver/storages/redis/impl/request.hpp>
 #include <userver/utils/assert.hpp>
 
@@ -20,10 +20,10 @@ namespace storages::redis {
 
 namespace impl {
 
-void Wait(USERVER_NAMESPACE::redis::Request& request);
+void Wait(impl::Request& request);
 
 template <ScanTag scan_tag>
-Request<ScanReplyTmpl<scan_tag>> MakeScanRequest(
+storages::redis::Request<ScanReplyTmpl<scan_tag>> MakeScanRequest(
     ClientImpl& client,
     std::string key,
     size_t shard,
@@ -44,23 +44,23 @@ Request<ScanReplyTmpl<scan_tag>> MakeScanRequest(
 
 class RequestDataImplBase {
 public:
-    RequestDataImplBase(USERVER_NAMESPACE::redis::Request&& request);
+    RequestDataImplBase(impl::Request&& request);
 
     virtual ~RequestDataImplBase();
 
 protected:
     ReplyPtr GetReply();
 
-    USERVER_NAMESPACE::redis::Request& GetRequest();
+    impl::Request& GetRequest();
 
 private:
-    USERVER_NAMESPACE::redis::Request request_;
+    impl::Request request_;
 };
 
 template <typename Result, typename ReplyType>
 class RequestDataImpl final : public RequestDataImplBase, public RequestDataBase<ReplyType> {
 public:
-    explicit RequestDataImpl(USERVER_NAMESPACE::redis::Request&& request) : RequestDataImplBase(std::move(request)) {}
+    explicit RequestDataImpl(impl::Request&& request) : RequestDataImplBase(std::move(request)) {}
 
     void Wait() override { impl::Wait(GetRequest()); }
 

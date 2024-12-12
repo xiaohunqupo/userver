@@ -5,7 +5,7 @@
 USERVER_NAMESPACE_BEGIN
 
 namespace {
-redis::CommandControl kDefaultCc(std::chrono::milliseconds(500), std::chrono::milliseconds(500), 1);
+storages::redis::CommandControl kDefaultCc(std::chrono::milliseconds(500), std::chrono::milliseconds(500), 1);
 
 class RedisClientTransactionTest : public RedisClientTest {
 public:
@@ -783,11 +783,13 @@ UTEST_F(RedisClientTransactionTest, Zscore) {
 
 namespace {
 
-std::uint64_t GetCommandCount(std::unordered_map<std::string, redis::ShardStatistics>& stat) {
+std::uint64_t GetCommandCount(std::unordered_map<std::string, storages::redis::impl::ShardStatistics>& stat) {
     std::uint64_t command_count = 0;
     std::for_each(stat.begin(), stat.end(), [&](auto& shard) {
         command_count +=
-            shard.second.shard_total.error_count[static_cast<std::size_t>(redis::ReplyStatus::kOk)].Load().value;
+            shard.second.shard_total.error_count[static_cast<std::size_t>(storages::redis::ReplyStatus::kOk)]
+                .Load()
+                .value;
     });
     return command_count;
 }

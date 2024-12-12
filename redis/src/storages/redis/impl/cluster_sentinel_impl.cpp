@@ -10,8 +10,8 @@
 #include <userver/logging/log.hpp>
 #include <userver/rcu/rcu.hpp>
 #include <userver/storages/redis/exception.hpp>
-#include <userver/storages/redis/impl/redis_state.hpp>
-#include <userver/storages/redis/impl/reply.hpp>
+#include <userver/storages/redis/redis_state.hpp>
+#include <userver/storages/redis/reply.hpp>
 #include <userver/utils/algo.hpp>
 #include <userver/utils/datetime/steady_coarse_clock.hpp>
 #include <userver/utils/fast_scope_guard.hpp>
@@ -28,7 +28,7 @@
 
 USERVER_NAMESPACE_BEGIN
 
-namespace redis {
+namespace storages::redis::impl {
 
 namespace {
 const auto kProcessCreationInterval = std::chrono::seconds(3);
@@ -1055,6 +1055,6 @@ PublishSettings ClusterSentinelImpl::GetPublishSettings() {
     return PublishSettings{kUnknownShard, false, CommandControl::Strategy::kEveryDc};
 }
 
-}  // namespace redis
+}  // namespace storages::redis::impl
 
 USERVER_NAMESPACE_END

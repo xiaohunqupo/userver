@@ -10,14 +10,14 @@
 #include <userver/utils/retry_budget.hpp>
 #include <userver/utils/swappingsmart.hpp>
 
+#include <userver/storages/redis/base.hpp>
 #include <userver/storages/redis/command_options.hpp>
-#include <userver/storages/redis/impl/base.hpp>
+#include <userver/storages/redis/fwd.hpp>
 #include <userver/storages/redis/impl/keyshard.hpp>
 #include <userver/storages/redis/impl/request.hpp>
 #include <userver/storages/redis/impl/secdist_redis.hpp>
 #include <userver/storages/redis/impl/thread_pools.hpp>
-#include <userver/storages/redis/impl/types.hpp>
-#include <userver/storages/redis/impl/wait_connected_mode.hpp>
+#include <userver/storages/redis/wait_connected_mode.hpp>
 
 #include <storages/redis/impl/redis_stats.hpp>
 
@@ -27,7 +27,7 @@ namespace engine::ev {
 class ThreadControl;
 }  // namespace engine::ev
 
-namespace redis {
+namespace storages::redis::impl {
 
 // We need only one thread for sentinels different from redis threads
 const int kDefaultSentinelThreadPoolSize = 1;
@@ -95,9 +95,9 @@ public:
 
     void ForceUpdateHosts();
 
-    static std::shared_ptr<redis::Sentinel> CreateSentinel(
+    static std::shared_ptr<Sentinel> CreateSentinel(
         const std::shared_ptr<ThreadPools>& thread_pools,
-        const secdist::RedisSettings& settings,
+        const USERVER_NAMESPACE::secdist::RedisSettings& settings,
         std::string shard_group_name,
         dynamic_config::Source dynamic_config_source,
         const std::string& client_name,
@@ -105,9 +105,9 @@ public:
         const CommandControl& command_control = {},
         const testsuite::RedisControl& testsuite_redis_control = {}
     );
-    static std::shared_ptr<redis::Sentinel> CreateSentinel(
+    static std::shared_ptr<Sentinel> CreateSentinel(
         const std::shared_ptr<ThreadPools>& thread_pools,
-        const secdist::RedisSettings& settings,
+        const USERVER_NAMESPACE::secdist::RedisSettings& settings,
         std::string shard_group_name,
         dynamic_config::Source dynamic_config_source,
         const std::string& client_name,
@@ -236,6 +236,6 @@ private:
     testsuite::RedisControl testsuite_redis_control_;
 };
 
-}  // namespace redis
+}  // namespace storages::redis::impl
 
 USERVER_NAMESPACE_END

@@ -36,7 +36,7 @@ UTEST_F(RedisClientTest, Sample) { RedisClientSampleUsage(*GetClient()); }
 UTEST_F(RedisClientTest, CancelRequest) {
     try {
         EXPECT_FALSE(RedisClientCancelRequest(*GetClient()));
-    } catch (const redis::RequestCancelledException&) {
+    } catch (const storages::redis::RequestCancelledException&) {
     }
 }
 

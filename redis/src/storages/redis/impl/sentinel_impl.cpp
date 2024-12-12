@@ -20,13 +20,13 @@
 #include <storages/redis/impl/sentinel.hpp>
 #include <userver/server/request/task_inherited_data.hpp>
 #include <userver/storages/redis/exception.hpp>
-#include <userver/storages/redis/impl/reply.hpp>
+#include <userver/storages/redis/reply.hpp>
 
 #include "command_control_impl.hpp"
 
 USERVER_NAMESPACE_BEGIN
 
-namespace redis {
+namespace storages::redis::impl {
 namespace {
 
 bool CheckQuorum(size_t requests_sent, size_t responses_parsed) {
@@ -1022,6 +1022,6 @@ bool SentinelImpl::ConnectedStatus::Wait(engine::Deadline deadline, const Pred& 
     return cv_.WaitUntil(lock, deadline, pred);
 }
 
-}  // namespace redis
+}  // namespace storages::redis::impl
 
 USERVER_NAMESPACE_END

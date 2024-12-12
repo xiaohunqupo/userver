@@ -8,9 +8,9 @@
 #include <userver/dynamic_config/value.hpp>
 #include <userver/engine/task/cancel.hpp>
 #include <userver/logging/log.hpp>
+#include <userver/storages/redis/base.hpp>
 #include <userver/storages/redis/exception.hpp>
-#include <userver/storages/redis/impl/base.hpp>
-#include <userver/storages/redis/impl/reply.hpp>
+#include <userver/storages/redis/reply.hpp>
 #include <userver/testsuite/testsuite_support.hpp>
 #include <userver/utils/assert.hpp>
 #include <userver/utils/impl/userver_experiments.hpp>
@@ -26,7 +26,7 @@
 
 USERVER_NAMESPACE_BEGIN
 
-namespace redis {
+namespace storages::redis::impl {
 namespace {
 
 void ThrowIfCancelled() {
@@ -198,9 +198,9 @@ std::shared_ptr<Sentinel> Sentinel::CreateSentinel(
     }
 
     LOG_DEBUG() << "redis command_control:" << command_control.ToString();
-    std::shared_ptr<redis::Sentinel> client;
+    std::shared_ptr<storages::redis::impl::Sentinel> client;
     if (!shards.empty() && !conns.empty()) {
-        client = std::make_shared<redis::Sentinel>(
+        client = std::make_shared<storages::redis::impl::Sentinel>(
             thread_pools,
             shards,
             conns,
@@ -421,6 +421,6 @@ void Sentinel::CheckRenameParams(const std::string& key, const std::string& newk
         throw InvalidArgumentException("key and newkey must have the same shard key");
 }
 
-}  // namespace redis
+}  // namespace storages::redis::impl
 
 USERVER_NAMESPACE_END

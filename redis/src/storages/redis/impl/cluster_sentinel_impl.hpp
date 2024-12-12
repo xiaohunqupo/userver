@@ -7,7 +7,7 @@ namespace engine::ev {
 class PeriodicWatcher;
 }
 
-namespace redis {
+namespace storages::redis::impl {
 class ClusterTopologyHolder;
 class ClusterNodesHolder;
 
@@ -99,6 +99,6 @@ private:
     dynamic_config::Source dynamic_config_source_;
 };
 
-}  // namespace redis
+}  // namespace storages::redis::impl
 
 USERVER_NAMESPACE_END

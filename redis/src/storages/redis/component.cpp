@@ -33,7 +33,7 @@
 #include "client_impl.hpp"
 #include "redis_secdist.hpp"
 #include "subscribe_client_impl.hpp"
-#include "userver/storages/redis/impl/base.hpp"
+#include "userver/storages/redis/base.hpp"
 
 #include <boost/range/adaptor/map.hpp>
 
@@ -104,13 +104,13 @@ RedisPools Parse(const yaml_config::YamlConfig& value, formats::parse::To<RedisP
     return pools;
 }
 
-redis::MetricsSettings::Level
-Parse(const yaml_config::YamlConfig& value, formats::parse::To<redis::MetricsSettings::Level>) {
+storages::redis::MetricsSettings::Level
+Parse(const yaml_config::YamlConfig& value, formats::parse::To<storages::redis::MetricsSettings::Level>) {
     constexpr utils::TrivialBiMap converter = [](auto selector) {
         return selector()
-            .Case("instance", redis::MetricsSettings::Level::kInstance)
-            .Case("shard", redis::MetricsSettings::Level::kShard)
-            .Case("cluster", redis::MetricsSettings::Level::kCluster);
+            .Case("instance", storages::redis::MetricsSettings::Level::kInstance)
+            .Case("shard", storages::redis::MetricsSettings::Level::kShard)
+            .Case("cluster", storages::redis::MetricsSettings::Level::kCluster);
     };
     const auto level_str = value.As<std::string>("instance");
     const auto ret = converter.TryFindByFirst(level_str);
@@ -140,7 +140,7 @@ Redis::Redis(const ComponentConfig& config, const ComponentContext& component_co
 }
 
 std::shared_ptr<storages::redis::Client>
-Redis::GetClient(const std::string& name, USERVER_NAMESPACE::redis::RedisWaitConnected wait_connected) const {
+Redis::GetClient(const std::string& name, storages::redis::RedisWaitConnected wait_connected) const {
     auto it = clients_.find(name);
     if (it == clients_.end())
         throw std::runtime_error(fmt::format(
@@ -152,7 +152,7 @@ Redis::GetClient(const std::string& name, USERVER_NAMESPACE::redis::RedisWaitCon
     return it->second;
 }
 
-std::shared_ptr<redis::Sentinel> Redis::Client(const std::string& name) const {
+std::shared_ptr<storages::redis::impl::Sentinel> Redis::Client(const std::string& name) const {
     auto it = sentinels_.find(name);
     if (it == sentinels_.end())
         throw std::runtime_error(fmt::format(
@@ -164,7 +164,7 @@ std::shared_ptr<redis::Sentinel> Redis::Client(const std::string& name) const {
 }
 
 std::shared_ptr<storages::redis::SubscribeClient>
-Redis::GetSubscribeClient(const std::string& name, USERVER_NAMESPACE::redis::RedisWaitConnected wait_connected) const {
+Redis::GetSubscribeClient(const std::string& name, storages::redis::RedisWaitConnected wait_connected) const {
     auto it = subscribe_clients_.find(name);
     if (it == subscribe_clients_.end())
         throw std::runtime_error(fmt::format(
@@ -187,27 +187,28 @@ void Redis::Connect(
     auto config_source = component_context.FindComponent<DynamicConfig>().GetSource();
 
     static_metrics_settings_.level =
-        Parse(config["metrics_level"], formats::parse::To<redis::MetricsSettings::Level>());
-    metrics_settings_.Assign(redis::MetricsSettings({}, static_metrics_settings_));
+        Parse(config["metrics_level"], formats::parse::To<storages::redis::MetricsSettings::Level>());
+    metrics_settings_.Assign(storages::redis::MetricsSettings({}, static_metrics_settings_));
     const auto redis_pools = config["thread_pools"].As<RedisPools>();
 
-    thread_pools_ =
-        std::make_shared<redis::ThreadPools>(redis_pools.sentinel_thread_pool_size, redis_pools.redis_thread_pool_size);
+    thread_pools_ = std::make_shared<storages::redis::impl::ThreadPools>(
+        redis_pools.sentinel_thread_pool_size, redis_pools.redis_thread_pool_size
+    );
 
     const auto redis_groups = config["groups"].As<std::vector<RedisGroup>>();
     for (const RedisGroup& redis_group : redis_groups) {
         auto settings = GetSecdistSettings(secdist_component, redis_group);
 
-        redis::CommandControl cc{};
+        storages::redis::CommandControl cc{};
         cc.allow_reads_from_master = redis_group.allow_reads_from_master;
 
-        auto sentinel = redis::Sentinel::CreateSentinel(
+        auto sentinel = storages::redis::impl::Sentinel::CreateSentinel(
             thread_pools_,
             settings,
             redis_group.config_name,
             config_source,
             redis_group.db,
-            redis::KeyShardFactory{redis_group.sharding_strategy},
+            storages::redis::impl::KeyShardFactory{redis_group.sharding_strategy},
             cc,
             testsuite_redis_control
         );
@@ -231,11 +232,11 @@ void Redis::Connect(
     for (const auto& redis_group : subscribe_redis_groups) {
         auto settings = GetSecdistSettings(secdist_component, redis_group);
 
-        bool is_cluster_mode = USERVER_NAMESPACE::redis::IsClusterStrategy(redis_group.sharding_strategy);
-        redis::CommandControl cc{};
+        bool is_cluster_mode = storages::redis::impl::IsClusterStrategy(redis_group.sharding_strategy);
+        storages::redis::CommandControl cc{};
         cc.allow_reads_from_master = redis_group.allow_reads_from_master;
 
-        auto sentinel = redis::SubscribeSentinel::Create(
+        auto sentinel = storages::redis::impl::SubscribeSentinel::Create(
             thread_pools_,
             settings,
             redis_group.config_name,
@@ -254,8 +255,8 @@ void Redis::Connect(
     }
 
     auto redis_wait_connected_subscribe = redis_config.redis_wait_connected;
-    if (redis_wait_connected_subscribe.mode != USERVER_NAMESPACE::redis::WaitConnectedMode::kNoWait)
-        redis_wait_connected_subscribe.mode = USERVER_NAMESPACE::redis::WaitConnectedMode::kMasterOrSlave;
+    if (redis_wait_connected_subscribe.mode != storages::redis::WaitConnectedMode::kNoWait)
+        redis_wait_connected_subscribe.mode = storages::redis::WaitConnectedMode::kMasterOrSlave;
     for (auto& subscribe_client_it : subscribe_clients_) {
         subscribe_client_it.second->WaitConnectedOnce(redis_wait_connected_subscribe);
     }
@@ -288,20 +289,21 @@ void Redis::OnConfigUpdate(const dynamic_config::Snapshot& cfg) {
     LOG_INFO() << "update default command control";
     const auto& redis_config = cfg[storages::redis::kConfig];
 
-    auto cc = std::make_shared<redis::CommandControl>(redis_config.default_command_control);
+    auto cc = std::make_shared<storages::redis::CommandControl>(redis_config.default_command_control);
     for (auto& it : sentinels_) {
         const auto& name = it.first;
         auto& client = it.second;
         client->SetConfigDefaultCommandControl(cc);
         client->SetCommandsBufferingSettings(redis_config.commands_buffering_settings);
         client->SetReplicationMonitoringSettings(redis_config.replication_monitoring_settings.GetOptional(name)
-                                                     .value_or(redis::ReplicationMonitoringSettings{}));
+                                                     .value_or(storages::redis::ReplicationMonitoringSettings{}));
         client->SetRetryBudgetSettings(
             redis_config.retry_budget_settings.GetOptional(name).value_or(utils::RetryBudgetSettings{})
         );
     }
 
-    auto subscriber_cc = std::make_shared<redis::CommandControl>(redis_config.subscriber_default_command_control);
+    auto subscriber_cc =
+        std::make_shared<storages::redis::CommandControl>(redis_config.subscriber_default_command_control);
     for (auto& it : subscribe_clients_) {
         auto& subscribe_client = it.second->GetNative();
         subscribe_client.SetConfigDefaultCommandControl(subscriber_cc);
@@ -310,7 +312,9 @@ void Redis::OnConfigUpdate(const dynamic_config::Snapshot& cfg) {
 
     auto metrics_settings = metrics_settings_.Read();
     if (metrics_settings->dynamic_settings != redis_config.metrics_settings) {
-        metrics_settings_.Assign(redis::MetricsSettings(redis_config.metrics_settings, static_metrics_settings_));
+        metrics_settings_.Assign(
+            storages::redis::MetricsSettings(redis_config.metrics_settings, static_metrics_settings_)
+        );
     }
 
     auto pubsub_metrics_settings = pubsub_metrics_settings_.Read();

@@ -23,8 +23,8 @@
 
 #include <storages/redis/impl/redis_stats.hpp>
 #include <userver/storages/redis/client.hpp>
-#include <userver/storages/redis/impl/types.hpp>
-#include <userver/storages/redis/impl/wait_connected_mode.hpp>
+#include <userver/storages/redis/fwd.hpp>
+#include <userver/storages/redis/wait_connected_mode.hpp>
 
 #include "ev_wrapper.hpp"
 #include "keys_for_shards.hpp"
@@ -35,7 +35,7 @@
 
 USERVER_NAMESPACE_BEGIN
 
-namespace redis {
+namespace storages::redis::impl {
 
 class SentinelImplBase {
 public:
@@ -273,6 +273,6 @@ private:
     std::atomic<int> publish_shard_{0};
 };
 
-}  // namespace redis
+}  // namespace storages::redis::impl
 
 USERVER_NAMESPACE_END
