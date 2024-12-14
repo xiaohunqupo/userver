@@ -6,12 +6,12 @@
 #include <fmt/ranges.h>
 
 #include <engine/ev/thread_pool.hpp>
+#include <storages/redis/impl/thread_pools.hpp>
 #include <userver/components/component.hpp>
 #include <userver/components/statistics_storage.hpp>
 #include <userver/dynamic_config/storage/component.hpp>
 #include <userver/formats/json/value_builder.hpp>
 #include <userver/logging/log.hpp>
-#include <userver/storages/redis/impl/thread_pools.hpp>
 #include <userver/storages/redis/reply.hpp>
 #include <userver/storages/secdist/component.hpp>
 #include <userver/storages/secdist/exceptions.hpp>

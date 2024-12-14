@@ -1,9 +1,9 @@
 #pragma once
 
 #include <userver/logging/log_extra.hpp>
-
-#include <userver/storages/redis/base.hpp>
 #include <userver/storages/redis/fwd.hpp>
+
+#include <storages/redis/impl/cmd_args.hpp>
 
 USERVER_NAMESPACE_BEGIN
 

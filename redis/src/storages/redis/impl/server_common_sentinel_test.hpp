@@ -1,8 +1,8 @@
 #pragma once
 
+#include <storages/redis/impl/thread_pools.hpp>
 #include <userver/dynamic_config/test_helpers.hpp>
 #include <userver/storages/redis/impl/secdist_redis.hpp>
-#include <userver/storages/redis/impl/thread_pools.hpp>
 
 #include <storages/redis/dynamic_config.hpp>
 #include <storages/redis/impl/mock_server_test.hpp>

@@ -6,9 +6,9 @@
 #include <string>
 #include <vector>
 
+#include <storages/redis/impl/request.hpp>
 #include <userver/storages/redis/base.hpp>
 #include <userver/storages/redis/command_options.hpp>
-#include <userver/storages/redis/impl/request.hpp>
 
 #include <userver/storages/redis/client.hpp>
 #include <userver/storages/redis/transaction.hpp>
@@ -18,6 +18,7 @@
 USERVER_NAMESPACE_BEGIN
 
 namespace storages::redis::impl {
+class CmdArgs;
 class Sentinel;
 }  // namespace storages::redis::impl
 
@@ -431,7 +432,7 @@ public:
 
 private:
     impl::Request MakeRequest(
-        CmdArgs&& args,
+        impl::CmdArgs&& args,
         size_t shard,
         bool master,
         const CommandControl& command_control,

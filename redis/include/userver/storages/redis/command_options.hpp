@@ -58,16 +58,21 @@ struct ZaddOptions {
     enum class ReturnValue { kAddedCount, kChangedCount };
 
     ZaddOptions() = default;
-    ZaddOptions(Exist exist, ReturnValue return_value = ReturnValue::kAddedCount)
+    constexpr ZaddOptions(Exist exist, ReturnValue return_value = ReturnValue::kAddedCount)
         : exist(exist), return_value(return_value) {}
-    ZaddOptions(ReturnValue return_value, Exist exist = Exist::kAddAlways) : exist(exist), return_value(return_value) {}
+    constexpr ZaddOptions(ReturnValue return_value, Exist exist = Exist::kAddAlways)
+        : exist(exist), return_value(return_value) {}
 
     Exist exist = Exist::kAddAlways;
     ReturnValue return_value = ReturnValue::kAddedCount;
 };
 
-ZaddOptions operator|(ZaddOptions::Exist exist, ZaddOptions::ReturnValue return_value);
-ZaddOptions operator|(ZaddOptions::ReturnValue return_value, ZaddOptions::Exist exist);
+constexpr ZaddOptions operator|(ZaddOptions::Exist exist, ZaddOptions::ReturnValue return_value) {
+    return {exist, return_value};
+}
+constexpr ZaddOptions operator|(ZaddOptions::ReturnValue return_value, ZaddOptions::Exist exist) {
+    return {exist, return_value};
+}
 
 class ScanOptionsBase {
 public:
@@ -150,19 +155,6 @@ struct RangeScoreOptions {
     ScoreOptions score_options;
     RangeOptions range_options;
 };
-
-void PutArg(CmdArgs::CmdArgsArray& args_, std::optional<ScanOptionsBase::Match> arg);
-void PutArg(CmdArgs::CmdArgsArray& args_, std::optional<ScanOptionsBase::Count> arg);
-void PutArg(CmdArgs::CmdArgsArray& args_, GeoaddArg arg);
-void PutArg(CmdArgs::CmdArgsArray& args_, std::vector<GeoaddArg> arg);
-void PutArg(CmdArgs::CmdArgsArray& args_, const GeoradiusOptions& arg);
-void PutArg(CmdArgs::CmdArgsArray& args_, const GeosearchOptions& arg);
-void PutArg(CmdArgs::CmdArgsArray& args_, const SetOptions& arg);
-void PutArg(CmdArgs::CmdArgsArray& args_, const ZaddOptions& arg);
-void PutArg(CmdArgs::CmdArgsArray& args_, const ScanOptions& arg);
-void PutArg(CmdArgs::CmdArgsArray& args_, const ScoreOptions& arg);
-void PutArg(CmdArgs::CmdArgsArray& args_, const RangeOptions& arg);
-void PutArg(CmdArgs::CmdArgsArray& args_, const RangeScoreOptions& arg);
 
 }  // namespace storages::redis
 

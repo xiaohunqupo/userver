@@ -13,7 +13,7 @@ class ReplyData;
 
 struct CommandControl;
 
-template <typename Result, typename ReplyType = Result>
+template <typename ResultType, typename ReplyType = ResultType>
 class [[nodiscard]] Request;
 
 using ReplyPtr = std::shared_ptr<Reply>;

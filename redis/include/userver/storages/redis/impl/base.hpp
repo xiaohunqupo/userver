@@ -6,7 +6,6 @@
 
 USERVER_NAMESPACE_BEGIN
 namespace redis {
-using storages::redis::CmdArgs;  // TODO: move to impl
 using storages::redis::CommandsBufferingSettings;
 using storages::redis::ConnectionInfo;
 using storages::redis::ConnectionSecurity;

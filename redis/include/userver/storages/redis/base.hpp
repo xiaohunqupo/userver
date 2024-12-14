@@ -50,66 +50,7 @@ struct Stat {
     double timeouts = 0.0;
 };
 
-class CmdArgs {  // TODO: move to impl
-public:
-    using CmdArgsArray = std::vector<std::string>;
-    using CmdArgsChain = std::vector<CmdArgsArray>;
-
-    CmdArgs() = default;
-
-    template <typename... Args>
-    CmdArgs(Args&&... _args) {
-        Then(std::forward<Args>(_args)...);
-    }
-
-    CmdArgs(const CmdArgs& o) = delete;
-    CmdArgs(CmdArgs&& o) = default;
-
-    CmdArgs& operator=(const CmdArgs& o) = delete;
-    CmdArgs& operator=(CmdArgs&& o) = default;
-
-    template <typename... Args>
-    CmdArgs& Then(Args&&... _args);
-
-    CmdArgs Clone() const {
-        CmdArgs r;
-        r.args = args;
-        return r;
-    }
-
-    CmdArgsChain args;
-};
-
-logging::LogHelper& operator<<(logging::LogHelper& os, const CmdArgs& v);
-
 using ScanCursor = int64_t;
-
-template <typename Arg>
-typename std::enable_if<std::is_arithmetic<Arg>::value, void>::type
-PutArg(CmdArgs::CmdArgsArray& args_, const Arg& arg) {
-    args_.emplace_back(std::to_string(arg));
-}
-
-void PutArg(CmdArgs::CmdArgsArray& args_, const char* arg);
-
-void PutArg(CmdArgs::CmdArgsArray& args_, const std::string& arg);
-
-void PutArg(CmdArgs::CmdArgsArray& args_, std::string&& arg);
-
-void PutArg(CmdArgs::CmdArgsArray& args_, const std::vector<std::string>& arg);
-
-void PutArg(CmdArgs::CmdArgsArray& args_, const std::vector<std::pair<std::string, std::string>>& arg);
-
-void PutArg(CmdArgs::CmdArgsArray& args_, const std::vector<std::pair<double, std::string>>& arg);
-
-template <typename... Args>
-CmdArgs& CmdArgs::Then(Args&&... _args) {
-    args.emplace_back();
-    auto& new_args = args.back();
-    new_args.reserve(sizeof...(Args));
-    (PutArg(new_args, std::forward<Args>(_args)), ...);
-    return *this;
-}
 
 struct CommandsBufferingSettings {
     bool buffering_enabled{false};

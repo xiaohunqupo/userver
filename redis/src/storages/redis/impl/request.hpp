@@ -16,6 +16,7 @@ class Span;
 
 namespace storages::redis::impl {
 
+class CmdArgs;
 struct Command;
 using CommandPtr = std::shared_ptr<Command>;
 class Sentinel;

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <userver/storages/redis/impl/thread_pools.hpp>
+#include <storages/redis/impl/thread_pools.hpp>
 
 #include <storages/redis/client_impl.hpp>
 #include <storages/redis/impl/sentinel.hpp>

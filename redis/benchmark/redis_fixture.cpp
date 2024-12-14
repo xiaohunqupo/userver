@@ -1,9 +1,9 @@
 #include "redis_fixture.hpp"
 
+#include <storages/redis/impl/thread_pools.hpp>
 #include <userver/dynamic_config/storage_mock.hpp>
 #include <userver/engine/run_standalone.hpp>
 #include <userver/engine/task/task.hpp>
-#include <userver/storages/redis/impl/thread_pools.hpp>
 
 #include <storages/redis/client_impl.hpp>
 #include <storages/redis/impl/sentinel.hpp>

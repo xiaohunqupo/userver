@@ -2,9 +2,9 @@
 
 #include <thread>
 
+#include <storages/redis/impl/thread_pools.hpp>
 #include <userver/storages/redis/base.hpp>
 #include <userver/storages/redis/impl/secdist_redis.hpp>
-#include <userver/storages/redis/impl/thread_pools.hpp>
 
 #include <storages/redis/impl/command.hpp>
 #include <storages/redis/impl/sentinel.hpp>

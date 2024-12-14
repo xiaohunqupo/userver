@@ -10,13 +10,13 @@
 #include <userver/utils/retry_budget.hpp>
 #include <userver/utils/swappingsmart.hpp>
 
+#include <storages/redis/impl/request.hpp>
+#include <storages/redis/impl/thread_pools.hpp>
 #include <userver/storages/redis/base.hpp>
 #include <userver/storages/redis/command_options.hpp>
 #include <userver/storages/redis/fwd.hpp>
 #include <userver/storages/redis/impl/keyshard.hpp>
-#include <userver/storages/redis/impl/request.hpp>
 #include <userver/storages/redis/impl/secdist_redis.hpp>
-#include <userver/storages/redis/impl/thread_pools.hpp>
 #include <userver/storages/redis/wait_connected_mode.hpp>
 
 #include <storages/redis/impl/redis_stats.hpp>

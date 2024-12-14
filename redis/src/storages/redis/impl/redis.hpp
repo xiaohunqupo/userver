@@ -9,9 +9,9 @@
 #include <engine/ev/thread_pool.hpp>
 #include <userver/utils/retry_budget.hpp>
 
+#include <storages/redis/impl/request.hpp>
 #include <userver/storages/redis/base.hpp>
 #include <userver/storages/redis/fwd.hpp>
-#include <userver/storages/redis/impl/request.hpp>
 #include <userver/storages/redis/redis_state.hpp>
 
 #include "redis_creation_settings.hpp"

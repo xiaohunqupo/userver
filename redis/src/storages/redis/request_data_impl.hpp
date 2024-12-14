@@ -3,8 +3,8 @@
 #include <memory>
 #include <string>
 
+#include <storages/redis/impl/request.hpp>
 #include <userver/storages/redis/base.hpp>
-#include <userver/storages/redis/impl/request.hpp>
 #include <userver/utils/assert.hpp>
 
 #include <userver/storages/redis/client.hpp>
@@ -42,27 +42,12 @@ storages::redis::Request<ScanReplyTmpl<scan_tag>> MakeScanRequest(
 
 }  // namespace impl
 
-class RequestDataImplBase {
-public:
-    RequestDataImplBase(impl::Request&& request);
-
-    virtual ~RequestDataImplBase();
-
-protected:
-    ReplyPtr GetReply();
-
-    impl::Request& GetRequest();
-
-private:
-    impl::Request request_;
-};
-
 template <typename Result, typename ReplyType>
-class RequestDataImpl final : public RequestDataImplBase, public RequestDataBase<ReplyType> {
+class RequestDataImpl final : public RequestDataBase<ReplyType> {
 public:
-    explicit RequestDataImpl(impl::Request&& request) : RequestDataImplBase(std::move(request)) {}
+    explicit RequestDataImpl(impl::Request&& request) : request_(std::move(request)) {}
 
-    void Wait() override { impl::Wait(GetRequest()); }
+    void Wait() override { impl::Wait(request_); }
 
     ReplyType Get(const std::string& request_description) override {
         auto reply = GetReply();
@@ -72,8 +57,13 @@ public:
     ReplyPtr GetRaw() override { return GetReply(); }
 
     engine::impl::ContextAccessor* TryGetContextAccessor() noexcept override {
-        return GetRequest().TryGetContextAccessor();
+        return request_.TryGetContextAccessor();
     }
+
+private:
+    ReplyPtr GetReply() { return request_.Get(); }
+
+    impl::Request request_;
 };
 
 template <typename Result, typename ReplyType>

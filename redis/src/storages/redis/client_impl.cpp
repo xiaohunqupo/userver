@@ -12,6 +12,7 @@ USERVER_NAMESPACE_BEGIN
 
 namespace storages::redis {
 
+using impl::CmdArgs;
 using impl::CommandControlImpl;
 
 namespace {

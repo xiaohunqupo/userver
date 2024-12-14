@@ -21,9 +21,10 @@ namespace storages::redis {
 template <ScanTag scan_tag>
 class RequestScanData;
 
-template <typename Result, typename ReplyType>
+template <typename ResultType, typename ReplyType>
 class [[nodiscard]] Request final {
 public:
+    using Result = ResultType;
     using Reply = ReplyType;
 
     explicit Request(std::unique_ptr<RequestDataBase<ReplyType>>&& impl) : impl_(std::move(impl)) {}
