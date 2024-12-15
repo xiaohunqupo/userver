@@ -9,6 +9,7 @@
 #include <userver/concurrent/async_event_source.hpp>
 #include <userver/dynamic_config/snapshot.hpp>
 #include <userver/engine/mutex.hpp>
+#include <userver/storages/secdist/secdist.hpp>
 #include <userver/utils/statistics/entry.hpp>
 
 #include <userver/storages/postgres/database.hpp>
@@ -173,15 +174,20 @@ public:
 private:
     void OnConfigUpdate(const dynamic_config::Snapshot& cfg);
 
+    void OnSecdistUpdate(const storages::secdist::SecdistConfig& secdist);
+
     std::string name_;
     std::string db_name_;
+    std::string dbalias_;
     storages::postgres::ClusterSettings initial_settings_;
     storages::postgres::DatabasePtr database_;
 
     // Subscriptions must be the last fields, because the fields above are used
     // from callbacks.
     concurrent::AsyncEventSubscriberScope config_subscription_;
+    concurrent::AsyncEventSubscriberScope secdist_subscription_;
     utils::statistics::Entry statistics_holder_;
+    dynamic_config::Source config_source_;
 };
 
 template <>
