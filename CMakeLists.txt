@@ -266,7 +266,9 @@ endif()
 
 add_subdirectory(libraries)
 
-add_subdirectory(scripts/gdb/tests)
+if (USERVER_BUILD_TESTS)
+  add_subdirectory(scripts/gdb/tests)
+endif()
 
 _userver_export_targets()
 _userver_make_install_config()
