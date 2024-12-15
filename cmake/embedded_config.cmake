@@ -9,21 +9,32 @@ set(TEMPLATE "
 
 #include <userver/utils/resources.hpp>
 
+#if defined(__APPLE__)
+#define APPLE_PREFIX \"_\"
+#else
+#define APPLE_PREFIX \"\"
+#endif
+
 __asm__(
 #if defined(__APPLE__)
-\".const_data\"
+\".const_data\\n\"
+\".global _@NAME@_start\\n\"
+\".global _@NAME@_end\\n\"
+\".global _@NAME@_size\\n\"
 #else
-\".section .rodata\"
+\".section .rodata\\n\"
 #endif
+\".balign 16\\n\"
+APPLE_PREFIX \"@NAME@_begin:\\n\"
 R\"(
-.align 16
-@NAME@_begin:
 .incbin \"${FILEPATH}\"
-@NAME@_end:
-.byte 0
-@NAME@_size:
-.int @NAME@_end - @NAME@_begin
-)\");
+)\"
+\".balign 1\\n\"
+APPLE_PREFIX \"@NAME@_end:\\n\"
+\".byte 0\\n\"
+APPLE_PREFIX \"@NAME@_size:\\n\"
+\".int \" APPLE_PREFIX \"@NAME@_end - \" APPLE_PREFIX \"@NAME@_begin\\n\"
+);
 
 extern \"C\" const char @NAME@_begin[];
 extern \"C\" const char @NAME@_end;
