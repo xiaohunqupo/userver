@@ -198,7 +198,11 @@ void HeartbeatSuccess(const mongoc_apm_server_heartbeat_succeeded_t* event) {
 void HeartbeatFailed(const mongoc_apm_server_heartbeat_failed_t* event) {
     auto& stats = GetStats(mongoc_apm_server_heartbeat_failed_get_context(event));
     ++stats.apm_stats_->heartbeats.failed;
-    LOG_LIMITED_WARNING() << mongoc_apm_server_heartbeat_failed_get_host(event)->host_and_port << " heartbeat failed";
+
+    MongoError error;
+    mongoc_apm_server_heartbeat_failed_get_error(event, error.GetNative());
+    LOG_LIMITED_WARNING() << mongoc_apm_server_heartbeat_failed_get_host(event)->host_and_port
+                          << " heartbeat failed with error: " << error.Message();
     HeartbeatFinished(stats);
 }
 
