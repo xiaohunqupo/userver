@@ -25,6 +25,8 @@
 #pragma clang diagnostic pop
 #endif
 
+#include <boost/version.hpp>
+
 USERVER_NAMESPACE_BEGIN
 
 namespace io = boost::asio;
@@ -60,7 +62,11 @@ private:
     void OnRead(boost::system::error_code ec, size_t count);
     void DoRead();
 
+#if BOOST_VERSION >= 107400
+    io::io_context io_service_;
+#else
     io::io_service io_service_;
+#endif
     io::ip::tcp::acceptor acceptor_;
     std::thread thread_;
 
