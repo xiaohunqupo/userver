@@ -44,7 +44,7 @@ yaml
         log-level: WARNING
 ```
 
-Logging per line and file can be overriden at runtime using @ref USERVER_LOG_DYNAMIC_DEBUG dynamic config.
+Logging per line and file can be overridden at runtime using @ref USERVER_LOG_DYNAMIC_DEBUG dynamic config.
 
 
 ### Dynamic change of the logging level

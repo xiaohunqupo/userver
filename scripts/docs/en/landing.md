@@ -152,7 +152,7 @@ int main(int argc, char* argv[]) {
                 storages::postgres::ClusterHostType::kSlave,
                 // Query is converted into a prepared statement. Subsequent requests
                 // send only parameters in a binary form and meta information is
-                // discarded on the DB side, significantly saving network bandwith.
+                // discarded on the DB side, significantly saving network bandwidth.
                 "SELECT value FROM key_value_table WHERE key=$1", key
             );
 

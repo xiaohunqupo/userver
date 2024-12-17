@@ -18,7 +18,7 @@ ClientImpl::ClientImpl(const USERVER_NAMESPACE::chaotic::openapi::client::Config
         auto r = http_client_.CreateRequest();
         SerializeRequest(request, r);
         ApplyConfig(r, command_control, config_);
-        {# TODO: apply extentions #}
+        {# TODO: apply extensions #}
         auto response = r.perform();
         return {{ op.cpp_namespace() }}::ParseResponse(*response);
       }

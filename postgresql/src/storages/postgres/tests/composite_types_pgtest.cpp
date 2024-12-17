@@ -868,7 +868,7 @@ UTEST_P(PostgreConnection, UnknownBufferCategoryExceptionReadability) {
         storages::postgres::UnknownBufferCategory,
         "Database type is 'tsquery' (oid: 3615) and it is not representable as a C++ type 'int' within a C++ composite "
         "'PairForUnknownBufferCategoryExceptionReadabilityTest'. Refer to the 'Supported data types' in the "
-        "documentation to find a propper C++ type."
+        "documentation to find a proper C++ type."
     );
 }
 

@@ -9,11 +9,11 @@ namespace kafka {
 /// @brief Represents the range of offsets for certain topic.
 struct OffsetRange final {
     /// @brief The low watermark offset. It indicates the earliest available offset in Kafka.
-    /// @note low offset is guaranteed to be commited
+    /// @note low offset is guaranteed to be committed
     std::uint32_t low{};
 
     /// @brief The high watermark offset. It indicates the next offset that will be written in Kafka.
-    /// @note high offset is not required to be commited yet
+    /// @note high offset is not required to be committed yet
     std::uint32_t high{};
 };
 

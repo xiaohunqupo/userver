@@ -249,7 +249,7 @@ UTEST_F_MT(ConsumerTest, OneConsumerPartitionOffsets, 2) {
                 );
                 EXPECT_EQ(offset_range.low, 0u);
 
-                // Note that offset is not yet commited, just fetched
+                // Note that offset is not yet committed, just fetched
                 if (msg.GetPartition() != kFirstPartition) {
                     EXPECT_EQ(offset_range.high, 1u);
                 } else {
