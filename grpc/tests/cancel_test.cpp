@@ -13,6 +13,7 @@
 #include <ugrpc/client/impl/client_configs.hpp>
 #include <userver/ugrpc/client/client_factory.hpp>
 #include <userver/ugrpc/client/exceptions.hpp>
+#include <userver/ugrpc/server/exceptions.hpp>
 #include <userver/ugrpc/server/server.hpp>
 #include <userver/ugrpc/tests/standalone_client.hpp>
 
