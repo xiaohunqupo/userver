@@ -300,7 +300,7 @@ UTILS_STRONG_TYPEDEF_REL_OP(>)
 UTILS_STRONG_TYPEDEF_REL_OP(<=)
 UTILS_STRONG_TYPEDEF_REL_OP(>=)
 
-#if __cpp_lib_three_way_comparison >= 201907L
+#if __cpp_lib_three_way_comparison >= 201711L || defined(ARCADIA_ROOT)
 UTILS_STRONG_TYPEDEF_REL_OP(<=>)
 #endif
 

@@ -548,7 +548,7 @@ public:
         return *this;
     }
 
-#ifdef __cpp_lib_three_way_comparison
+#if __cpp_lib_three_way_comparison >= 201711L || defined(ARCADIA_ROOT)
     constexpr auto operator<=>(const Decimal& rhs) const = default;
 #else
     constexpr bool operator==(Decimal rhs) const { return value_ == rhs.value_; }
