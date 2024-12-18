@@ -1466,6 +1466,7 @@
   "core/src/logging/log_test.cpp":"taxi/uservices/userver/core/src/logging/log_test.cpp",
   "core/src/logging/logger.cpp":"taxi/uservices/userver/core/src/logging/logger.cpp",
   "core/src/logging/logging_test.hpp":"taxi/uservices/userver/core/src/logging/logging_test.hpp",
+  "core/src/logging/ratelimited_log_test.cpp":"taxi/uservices/userver/core/src/logging/ratelimited_log_test.cpp",
   "core/src/logging/socket_logging_test.hpp":"taxi/uservices/userver/core/src/logging/socket_logging_test.hpp",
   "core/src/logging/split_location.hpp":"taxi/uservices/userver/core/src/logging/split_location.hpp",
   "core/src/logging/split_location_test.cpp":"taxi/uservices/userver/core/src/logging/split_location_test.cpp",
