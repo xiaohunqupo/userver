@@ -26,6 +26,11 @@ NYdb::TAsyncStatus RetryOperation(NYdb::NTable::TTableClient& table_client, Args
     return table_client.RetryOperation(std::forward<Args>(args)...);
 }
 
+template <typename... Args>
+NYdb::TAsyncStatus RetryOperation(NYdb::NQuery::TQueryClient& query_client, Args&&... args) {
+    return query_client.RetryQuery(std::forward<Args>(args)...);
+}
+
 template <typename Client, typename Fn>
 class RetryHandler : public std::enable_shared_from_this<RetryHandler<Client, Fn>> {
 public:
@@ -118,6 +123,18 @@ auto RetryOperation(impl::RequestContext& request_context, Fn&& fn) {
     auto& client = request_context.table_client.GetNativeTableClient();
     auto& retry_budget = request_context.table_client.GetRetryBudget();
     auto ctx = std::make_shared<RetryHandler<NYdb::NTable::TTableClient, Fn>>(
+        client, retry_budget, PrepareRetrySettings(request_context.settings, retry_budget), std::forward<Fn>(fn)
+    );
+    return ctx->Execute();
+}
+
+template <typename Fn>
+auto RetryQueryOperation(impl::RequestContext& request_context, Fn&& fn) {
+    static_assert(std::is_invocable_v<Fn&, NYdb::NQuery::TSession> || std::is_invocable_v<Fn&, NYdb::NQuery::TQueryClient&>);
+
+    auto& client = request_context.table_client.GetNativeQueryClient();
+    auto& retry_budget = request_context.table_client.GetRetryBudget();
+    auto ctx = std::make_shared<RetryHandler<NYdb::NQuery::TQueryClient, Fn>>(
         client, retry_budget, PrepareRetrySettings(request_context.settings, retry_budget), std::forward<Fn>(fn)
     );
     return ctx->Execute();
