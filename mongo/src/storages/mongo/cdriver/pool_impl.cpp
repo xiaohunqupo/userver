@@ -349,9 +349,13 @@ CDriverPoolImpl::CDriverPoolImpl(
         {config.maintenance_period, {utils::PeriodicTask::Flags::kStrong}},
         [this] { DoMaintenance(); }
     );
+
+    Start();  // Must be the last line in the constructor
 }
 
 CDriverPoolImpl::~CDriverPoolImpl() {
+    Stop();  // Must be the first line in the destructor
+
     tracing::Span span("mongo_destroy");
     maintenance_task_.Stop();
 }

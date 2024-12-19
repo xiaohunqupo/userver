@@ -54,8 +54,6 @@ Mongo::Mongo(const ComponentConfig& config, const ComponentContext& context) : C
         secdist_subscriber_ = secdist->UpdateAndListen(this, dbalias_, &Mongo::OnSecdistUpdate);
     }
 
-    pool_->Start();
-
     auto& statistics_storage = context.FindComponent<components::StatisticsStorage>();
 
     auto section_name = config.Name();
@@ -74,9 +72,8 @@ Mongo::Mongo(const ComponentConfig& config, const ComponentContext& context) : C
 }
 
 Mongo::~Mongo() {
-    pool_->Stop();
-
     statistics_holder_.Unregister();
+    secdist_subscriber_.Unsubscribe();
 }
 
 storages::mongo::PoolPtr Mongo::GetPool() const { return pool_; }

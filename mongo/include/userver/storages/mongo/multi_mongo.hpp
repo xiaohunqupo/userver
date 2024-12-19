@@ -99,7 +99,8 @@ private:
     const storages::mongo::PoolConfig pool_config_;
     clients::dns::Resolver* dns_resolver_;
     rcu::Variable<PoolMap> pool_map_;
-    // config_subscriber_ must be the last field.
+
+    // Subscriptions (config_subscriber_ and secdist_subscriber_) must be the last fields.
     concurrent::AsyncEventSubscriberScope config_subscriber_;
     concurrent::AsyncEventSubscriberScope secdist_subscriber_;
 };

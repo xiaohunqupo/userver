@@ -33,9 +33,9 @@ Pool::Pool(
           config_source
       )) {}
 
-void Pool::Start() { impl_->Start(); }
+Pool::Pool(Pool&&) noexcept = default;
 
-void Pool::Stop() { impl_->Stop(); }
+Pool& Pool::operator=(Pool&&) noexcept = default;
 
 Pool::~Pool() = default;
 
