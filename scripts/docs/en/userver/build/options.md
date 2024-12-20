@@ -165,7 +165,6 @@ cmake ... -DCMAKE_C_COMPILER=clang-12 -DCMAKE_CXX_COMPILER=clang++-12
 | `USERVER_PIP_OPTIONS`                  | Options for all pip calls. Useful for passing `--no-index` option to prevent network usage                  | (no options)                                                |
 | `USERVER_INSTALL`                      | Build userver for further installation                                                                      | `OFF`                                                       |
 | `USERVER_CONAN`                        | Build userver using Conan packages                                                                          | `ON` if build is launched from Conan, `OFF` otherwise       |
-| `USERVER_GENERATE_PROTOS_AT_CONFIGURE` | Run protoc at CMake Configure time for better IDE integration                                               | `OFF` for downloaded Protobuf, `ON` otherwise               |
 | `USERVER_CHAOTIC_FORMAT`               | Whether to format generated code if FORMAT option is missing                                                | `ON`                                                        |
 
 @warning Using LTO can lead to [some problems](https://github.com/userver-framework/userver/issues/242). We don't recommend using `USERVER_LTO`.

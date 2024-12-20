@@ -101,6 +101,7 @@ function(userver_target_generate_chaotic TARGET)
     list(APPEND SCHEMAS "${SCHEMA}")
   endforeach()
 
+  _userver_initialize_codegen_flag()
   add_custom_command(
       OUTPUT
           ${SCHEMAS}
@@ -119,6 +120,7 @@ function(userver_target_generate_chaotic TARGET)
       WORKING_DIRECTORY
           "${CMAKE_CURRENT_SOURCE_DIR}"
       VERBATIM
+      ${CODEGEN}
   )
   add_library("${TARGET}" ${SCHEMAS})
   target_link_libraries("${TARGET}" userver::chaotic)
@@ -166,16 +168,17 @@ function(userver_target_generate_openapi_client TARGET)
     "${PARSE_OUTPUT_DIR}/src/client/${PARSE_NAME}/responses.cpp"
   )
 
+  _userver_initialize_codegen_flag()
   add_custom_command(
       OUTPUT
           ${SCHEMAS}
       COMMAND
           env
           "USERVER_PYTHON=${USERVER_CHAOTIC_PYTHON_BINARY}"
-	  "${CHAOTIC_OPENAPI_BIN}"
+	      "${CHAOTIC_OPENAPI_BIN}"
           ${CHAOTIC_EXTRA_ARGS}
           ${PARSE_ARGS}
-	  --name "${PARSE_NAME}"
+	      --name "${PARSE_NAME}"
           -o "${PARSE_OUTPUT_DIR}"
           ${PARSE_SCHEMAS}
       DEPENDS
@@ -183,6 +186,7 @@ function(userver_target_generate_openapi_client TARGET)
       WORKING_DIRECTORY
           "${CMAKE_CURRENT_SOURCE_DIR}"
       VERBATIM
+      ${CODEGEN}
   )
   add_library("${TARGET}" ${SCHEMAS})
   target_link_libraries("${TARGET}" userver::chaotic-openapi)
