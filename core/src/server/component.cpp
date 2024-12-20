@@ -89,15 +89,15 @@ properties:
         description: describes the request processing socket
         additionalProperties: false
         properties: &server-listener-properties
-            address:
+            address: &ports-address
                 type: string
                 description: IPv6 or IPv4 network interface to bind to
                 defaultDescription: "::"
-            port:
+            port: &ports-port
                 type: integer
                 description: port to listen on
                 defaultDescription: 0
-            unix-socket:
+            unix-socket: &ports-unix-socket
                 type: string
                 description: unix socket to listen on instead of listening on a port
                 defaultDescription: ''
@@ -112,7 +112,7 @@ properties:
                 type: integer
                 description: max count of new connections pending acceptance
                 defaultDescription: 1024
-            tls:
+            tls: &ports-tls
                 type: object
                 description: TLS settings
                 additionalProperties: false
@@ -132,6 +132,18 @@ properties:
                     private-key-passphrase-name:
                         type: string
                         description: passphrase name located in secdist
+            ports:
+               description: settings of listener ports
+               type: array
+               items:
+                   type: object
+                   additionalProperties: false
+                   description: settings of listener port
+                   properties:
+                       address: *ports-address
+                       port: *ports-port
+                       unix-socket: *ports-unix-socket
+                       tls: *ports-tls
             handler-defaults:
                 type: object
                 description: handler defaults options

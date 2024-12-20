@@ -524,6 +524,8 @@
   "core/functional_tests/basic_chaos/tests-dynconf-cache/test_starts.py":"taxi/uservices/userver/core/functional_tests/basic_chaos/tests-dynconf-cache/test_starts.py",
   "core/functional_tests/basic_chaos/tests-max-request-size/conftest.py":"taxi/uservices/userver/core/functional_tests/basic_chaos/tests-max-request-size/conftest.py",
   "core/functional_tests/basic_chaos/tests-max-request-size/test_max_request_size.py":"taxi/uservices/userver/core/functional_tests/basic_chaos/tests-max-request-size/test_max_request_size.py",
+  "core/functional_tests/basic_chaos/tests-multiple-ports/conftest.py":"taxi/uservices/userver/core/functional_tests/basic_chaos/tests-multiple-ports/conftest.py",
+  "core/functional_tests/basic_chaos/tests-multiple-ports/test_ports.py":"taxi/uservices/userver/core/functional_tests/basic_chaos/tests-multiple-ports/test_ports.py",
   "core/functional_tests/basic_chaos/tests-nonchaos/conftest.py":"taxi/uservices/userver/core/functional_tests/basic_chaos/tests-nonchaos/conftest.py",
   "core/functional_tests/basic_chaos/tests-nonchaos/handlers/test_log_request_headers.py":"taxi/uservices/userver/core/functional_tests/basic_chaos/tests-nonchaos/handlers/test_log_request_headers.py",
   "core/functional_tests/basic_chaos/tests-nonchaos/metrics/test_has_reopening_error_metric.py":"taxi/uservices/userver/core/functional_tests/basic_chaos/tests-nonchaos/metrics/test_has_reopening_error_metric.py",
