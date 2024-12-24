@@ -3,6 +3,7 @@
 /// @file userver/ugrpc/client/rpc.hpp
 /// @brief Classes representing an outgoing RPC
 
+#include <exception>
 #include <memory>
 #include <string_view>
 #include <utility>
@@ -68,7 +69,7 @@ public:
     ///
     /// Upon completion result is available in `response` when initiating the
     /// asynchronous operation, e.g. FinishAsync.
-    [[nodiscard]] engine::FutureStatus WaitUntil(engine::Deadline deadline) const;
+    [[nodiscard]] engine::FutureStatus WaitUntil(engine::Deadline deadline) const noexcept;
 
     /// @brief Await response
     ///
@@ -87,8 +88,11 @@ public:
     /// @endcond
 
 private:
+    void ProcessFinish() const;
+
     impl::RpcData* data_{};
     std::function<void(impl::RpcData& data, const grpc::Status& status)> post_finish_;
+    mutable std::exception_ptr exception_;
 };
 
 /// @brief StreamReadFuture for waiting a single read response from stream
