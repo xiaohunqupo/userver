@@ -4,6 +4,7 @@
 #include <iostream>
 #include <unordered_map>
 
+#include <fmt/ranges.h>
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/program_options.hpp>
 
