@@ -8,7 +8,6 @@ find_package(userver REQUIRED COMPONENTS
   core
 )
 
-include("${USERVER_CMAKE_DIR}/modules/Findlibz.cmake")
 include("${USERVER_CMAKE_DIR}/modules/Findlz4.cmake")
 include("${USERVER_CMAKE_DIR}/modules/FindRdKafka.cmake")
 
