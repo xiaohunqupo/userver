@@ -78,12 +78,6 @@ class UserverConan(ConanFile):
         'grpc/*:objective_c_plugin': False,
     }
 
-    # scm = {
-    #     'type': 'git',
-    #     'url': 'https://github.com/userver-framework/userver.git',
-    #     'revision': 'develop'
-    # }
-
     def set_version(self):
         content = load(
             self,
@@ -104,14 +98,6 @@ class UserverConan(ConanFile):
         )
 
         self.version = f'{major_version}.{minor_version}'
-
-    @property
-    def _source_subfolder(self):
-        return 'source'
-
-    @property
-    def _build_subfolder(self):
-        return os.path.join(self.build_folder)
 
     def layout(self):
         cmake_layout(self)
@@ -197,6 +183,7 @@ class UserverConan(ConanFile):
         tool_ch.variables['CMAKE_FIND_DEBUG_MODE'] = False
 
         tool_ch.variables['USERVER_CONAN'] = True
+        tool_ch.variables['USERVER_INSTALL'] = True
         tool_ch.variables['USERVER_DOWNLOAD_PACKAGES'] = True
         tool_ch.variables['USERVER_FEATURE_DWCAS'] = True
         tool_ch.variables['USERVER_NAMESPACE'] = self.options.namespace
@@ -247,184 +234,9 @@ class UserverConan(ConanFile):
         cmake.configure()
         cmake.build()
 
-    @property
-    def _cmake_subfolder(self):
-        return os.path.join(self.package_folder, 'cmake')
-
     def package(self):
-        copy(self, pattern='LICENSE', src=self.source_folder, dst='licenses')
-
-        copy(
-            self,
-            pattern='*',
-            dst=os.path.join(self.package_folder, 'scripts'),
-            src=os.path.join(self.source_folder, 'scripts'),
-            keep_path=True,
-        )
-
-        copy(
-            self,
-            pattern='*',
-            dst=os.path.join(
-                self.package_folder, 'include', 'function_backports',
-            ),
-            src=os.path.join(
-                self.source_folder,
-                'third_party',
-                'function_backports',
-                'include',
-            ),
-            keep_path=True,
-        )
-
-        def copy_component(component, is_library: bool = False):
-            component_path = (
-                os.path.join('libraries', component)
-                if is_library
-                else component
-            )
-            copy(
-                self,
-                pattern='*',
-                dst=os.path.join(self.package_folder, 'include', component),
-                src=os.path.join(
-                    self.source_folder, component_path, 'include',
-                ),
-                keep_path=True,
-            )
-            copy(
-                self,
-                pattern='*.a',
-                dst=os.path.join(self.package_folder, 'lib'),
-                src=os.path.join(self._build_subfolder, component_path),
-                keep_path=False,
-            )
-
-        copy_component('core')
-        copy_component('universal')
-        for cmake_file in (
-            'UserverSetupEnvironment',
-            'SetupLinker',
-            'SetupLTO',
-            'SetupPGO',
-            'UserverVenv',
-        ):
-            copy(
-                self,
-                pattern=f'{cmake_file}.cmake',
-                dst=os.path.join(self.package_folder, 'cmake'),
-                src=os.path.join(self.source_folder, 'cmake'),
-                keep_path=True,
-            )
-
-        if self.options.with_grpc:
-            copy_component('grpc')
-            copy(
-                self,
-                pattern='*',
-                dst=os.path.join(self.package_folder, 'include', 'grpc'),
-                src=os.path.join(
-                    self.source_folder, 'grpc', 'handlers', 'include',
-                ),
-                keep_path=True,
-            )
-            copy(
-                self,
-                pattern='*pb.h',
-                dst=os.path.join(self.package_folder, 'include'),
-                src=os.path.join(self._build_subfolder, 'grpc', 'proto'),
-                keep_path=True,
-            )
-            copy(
-                self,
-                pattern='UserverGrpcTargets.cmake',
-                dst=os.path.join(self.package_folder, 'cmake'),
-                src=os.path.join(self.source_folder, 'cmake'),
-                keep_path=True,
-            )
-
-            with open(
-                os.path.join(self.package_folder, 'cmake', 'GrpcConan.cmake'),
-                'a+',
-            ) as grpc_file:
-                grpc_file.write('\nset(USERVER_CONAN TRUE)')
-        if self.options.with_utest:
-            copy(
-                self,
-                pattern='*',
-                dst=os.path.join(self.package_folder, 'include', 'utest'),
-                src=os.path.join(
-                    self.source_folder, 'universal', 'utest', 'include',
-                ),
-                keep_path=True,
-            )
-            copy(
-                self,
-                pattern='*',
-                dst=os.path.join(self.package_folder, 'include', 'utest'),
-                src=os.path.join(
-                    self.source_folder, 'core', 'utest', 'include',
-                ),
-                keep_path=True,
-            )
-            copy(
-                self,
-                pattern='*',
-                dst=os.path.join(self.package_folder, 'testsuite'),
-                src=os.path.join(self.source_folder, 'testsuite'),
-                keep_path=True,
-            )
-            copy(
-                self,
-                pattern='AddGoogleTests.cmake',
-                dst=os.path.join(self.package_folder, 'cmake'),
-                src=os.path.join(self.source_folder, 'cmake'),
-                keep_path=True,
-            )
-        if self.options.with_grpc or self.options.with_utest:
-            copy(
-                self,
-                pattern='UserverTestsuite.cmake',
-                dst=os.path.join(self.package_folder, 'cmake'),
-                src=os.path.join(self.source_folder, 'cmake'),
-                keep_path=True,
-            )
-            copy(
-                self,
-                pattern='SetupProtobuf.cmake',
-                dst=os.path.join(self.package_folder, 'cmake'),
-                src=os.path.join(self.source_folder, 'cmake'),
-                keep_path=True,
-            )
-        if self.options.with_postgresql:
-            copy_component('postgresql')
-
-        if self.options.with_mongodb:
-            copy_component('mongo')
-
-        if self.options.with_redis:
-            copy_component('redis')
-
-        if self.options.with_rabbitmq:
-            copy_component('rabbitmq')
-
-        if self.options.with_clickhouse:
-            copy_component('clickhouse')
-
-        if self.options.with_kafka:
-            copy_component('kafka')
-
-        if self.options.with_otlp:
-            copy_component('otlp')
-
-        if self.options.with_easy:
-            copy_component('easy', is_library=True)
-
-        if self.options.with_s3api:
-            copy_component('s3api', is_library=True)
-
-        if self.options.with_grpc_reflection:
-            copy_component('grpc-reflection', is_library=True)
+        cmake = CMake(self)
+        cmake.install()
 
     @property
     def _userver_components(self):
@@ -736,13 +548,7 @@ class UserverConan(ConanFile):
                     self.cpp_info.components[
                         cmake_component
                     ].includedirs.append(
-                        os.path.join('include', 'function_backports'),
-                    )
-                if cmake_component != 'ubench':
-                    self.cpp_info.components[
-                        conan_component
-                    ].includedirs.append(
-                        os.path.join('include', cmake_component),
+                        os.path.join('include', 'userver', 'third_party'),
                     )
 
                 self.cpp_info.components[conan_component].requires = requires
@@ -761,32 +567,43 @@ class UserverConan(ConanFile):
 
         add_components(self._userver_components)
 
+        def _cmake_path_to(name):
+            return os.path.join(
+                self.package_folder, 'lib', 'cmake', 'userver', name,
+            )
+
         with open(
-            os.path.join(self._cmake_subfolder, 'CallSetupEnv.cmake'), 'w',
+            _cmake_path_to('UserverSetupPathsInConan.cmake'), 'w',
         ) as cmake_file:
-            cmake_file.write('userver_setup_environment()')
+            cmake_file.write(
+                'set(USERVER_CMAKE_DIR "${CMAKE_CURRENT_LIST_DIR}")\n',
+            )
+            cmake_file.write(
+                'set_property(GLOBAL PROPERTY userver_cmake_dir "${USERVER_CMAKE_DIR}")\n',
+            )
+            cmake_file.write('set(USERVER_CONAN TRUE)\n')
+            cmake_file.write(
+                'set(USERVER_GRPC_SCRIPTS_PATH "${USERVER_CMAKE_DIR}/grpc")\n',
+            )
+            cmake_file.write(
+                'set(USERVER_TESTSUITE_DIR "${USERVER_CMAKE_DIR}/testsuite")\n',
+            )
+
+        with open(_cmake_path_to('CallSetupEnv.cmake'), 'w') as cmake_file:
+            cmake_file.write('userver_setup_environment()\n')
 
         build_modules = [
-            os.path.join(
-                self._cmake_subfolder, 'UserverSetupEnvironment.cmake',
-            ),
-            os.path.join(self._cmake_subfolder, 'CallSetupEnv.cmake'),
-            os.path.join(self._cmake_subfolder, 'UserverVenv.cmake'),
-            os.path.join(self._cmake_subfolder, 'UserverTestsuite.cmake'),
+            _cmake_path_to('UserverSetupPathsInConan.cmake'),
+            _cmake_path_to('UserverSetupEnvironment.cmake'),
+            _cmake_path_to('CallSetupEnv.cmake'),
+            _cmake_path_to('UserverVenv.cmake'),
+            _cmake_path_to('UserverTestsuite.cmake'),
         ]
         if self.options.with_utest:
-            build_modules.append(
-                os.path.join(self._cmake_subfolder, 'AddGoogleTests.cmake'),
-            )
+            build_modules.append(_cmake_path_to('AddGoogleTests.cmake'))
+
         if self.options.with_grpc:
-            build_modules.append(
-                os.path.join(self._cmake_subfolder, 'SetupProtobuf.cmake'),
-            )
-            build_modules.append(
-                os.path.join(self._cmake_subfolder, 'GrpcConan.cmake'),
-            )
-            build_modules.append(
-                os.path.join(self._cmake_subfolder, 'UserverGrpcTargets.cmake'),
-            )
+            build_modules.append(_cmake_path_to('SetupProtobuf.cmake'))
+            build_modules.append(_cmake_path_to('UserverGrpcTargets.cmake'))
 
         self.cpp_info.set_property('cmake_build_modules', build_modules)
