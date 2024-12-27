@@ -1,7 +1,7 @@
 project(userver-mongo CXX)
 
 if (USERVER_CONAN)
-  find_package(mongoc-1.0 REQUIRED)
+  find_package(mongoc-1.0 REQUIRED CONFIG)
   set_target_properties(mongo::bson_static PROPERTIES IMPORTED_GLOBAL TRUE)
   set_target_properties(mongo::mongoc_static PROPERTIES IMPORTED_GLOBAL TRUE)
   add_library(bson ALIAS mongo::bson_static)
