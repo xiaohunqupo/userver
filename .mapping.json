@@ -3682,6 +3682,7 @@
   "scripts/sql/requirements.txt":"taxi/uservices/userver/scripts/sql/requirements.txt",
   "scripts/sql/templates/sql.cpp.jinja":"taxi/uservices/userver/scripts/sql/templates/sql.cpp.jinja",
   "scripts/sql/templates/sql.hpp.jinja":"taxi/uservices/userver/scripts/sql/templates/sql.hpp.jinja",
+  "scripts/tests/conanfile.py":"taxi/uservices/userver/scripts/tests/conanfile.py",
   "scripts/tests/test_start_with_testsuite.sh":"taxi/uservices/userver/scripts/tests/test_start_with_testsuite.sh",
   "scripts/uctl/uctl.bash_completion.sh":"taxi/uservices/userver/scripts/uctl/uctl.bash_completion.sh",
   "scripts/uctl/uctl.py":"taxi/uservices/userver/scripts/uctl/uctl.py",
