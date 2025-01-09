@@ -3950,6 +3950,7 @@
   "third_party/uboost_coro/src/context/asm/ontop_x86_64_sysv_macho_gas.S":"taxi/uservices/userver/third_party/uboost_coro/src/context/asm/ontop_x86_64_sysv_macho_gas.S",
   "third_party/uboost_coro/src/context/continuation.cpp":"taxi/uservices/userver/third_party/uboost_coro/src/context/continuation.cpp",
   "third_party/uboost_coro/src/context/dummy.cpp":"taxi/uservices/userver/third_party/uboost_coro/src/context/dummy.cpp",
+  "third_party/uboost_coro/src/context/fcontext.cpp":"taxi/uservices/userver/third_party/uboost_coro/src/context/fcontext.cpp",
   "third_party/uboost_coro/src/context/fiber.cpp":"taxi/uservices/userver/third_party/uboost_coro/src/context/fiber.cpp",
   "third_party/uboost_coro/src/context/posix/stack_traits.cpp":"taxi/uservices/userver/third_party/uboost_coro/src/context/posix/stack_traits.cpp",
   "third_party/uboost_coro/src/context/untested.cpp":"taxi/uservices/userver/third_party/uboost_coro/src/context/untested.cpp",
