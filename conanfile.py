@@ -76,6 +76,11 @@ class UserverConan(ConanFile):
         'grpc/*:ruby_plugin': False,
         'grpc/*:csharp_plugin': False,
         'grpc/*:objective_c_plugin': False,
+        'librdkafka/*:ssl': True,
+        'librdkafka/*:curl': True,
+        'librdkafka/*:sasl': True,
+        'librdkafka/*:zlib': True,
+        'librdkafka/*:zstd': True,
     }
 
     def set_version(self):

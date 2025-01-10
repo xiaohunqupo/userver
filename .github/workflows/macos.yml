@@ -25,6 +25,7 @@ jobs:
             CMAKE_FLAGS: >-
                 -GNinja
                 -DCMAKE_BUILD_TYPE=Debug
+                -DUSERVER_USE_STATIC_LIBS=1
                 -DUSERVER_NO_WERROR=1
                 -DUSERVER_BUILD_ALL_COMPONENTS=1
                 -DUSERVER_BUILD_SAMPLES=1
@@ -48,7 +49,7 @@ jobs:
                 path: |
                     ${{env.CCACHE_DIR}}
                     ${{env.CPM_SOURCE_CACHE}}
-                key: 'macos-cache-dir ${{github.ref}}'
+                key: 'macos-cache-dir ${{github.ref}} run-${{github.run_number}}'
                 restore-keys: |
                     macos-cache-dir ${{github.ref}}
                     macos-cache-dir
@@ -63,6 +64,12 @@ jobs:
                 brew install lld
 
                 brew link postgresql@16 # postgresql is keg-only
+                brew link --force zlib # keg-only + need for static linkage
+                brew link --force icu4c@76 # keg-only + need for static boost linkage
+                brew link --force curl # keg-only
+                brew link --force cyrus-sasl # keg-only
+                brew link --force openldap # keg-only
+                brew remove --ignore-dependencies abseil
 
           - name: Setup ccache
             run: |
