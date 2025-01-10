@@ -2930,7 +2930,6 @@
   "redis/include/userver/storages/redis/expire_reply.hpp":"taxi/uservices/userver/redis/include/userver/storages/redis/expire_reply.hpp",
   "redis/include/userver/storages/redis/fwd.hpp":"taxi/uservices/userver/redis/include/userver/storages/redis/fwd.hpp",
   "redis/include/userver/storages/redis/hedged_request.hpp":"taxi/uservices/userver/redis/include/userver/storages/redis/hedged_request.hpp",
-  "redis/include/userver/storages/redis/impl/base.hpp":"taxi/uservices/userver/redis/include/userver/storages/redis/impl/base.hpp",
   "redis/include/userver/storages/redis/impl/keyshard.hpp":"taxi/uservices/userver/redis/include/userver/storages/redis/impl/keyshard.hpp",
   "redis/include/userver/storages/redis/impl/secdist_redis.hpp":"taxi/uservices/userver/redis/include/userver/storages/redis/impl/secdist_redis.hpp",
   "redis/include/userver/storages/redis/impl/transaction_subrequest_data.hpp":"taxi/uservices/userver/redis/include/userver/storages/redis/impl/transaction_subrequest_data.hpp",
