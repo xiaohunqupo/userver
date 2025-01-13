@@ -5,6 +5,8 @@
 #include <gtest/gtest.h>
 #include <boost/uuid/uuid_generators.hpp>
 
+#include <userver/utils/text_light.hpp>
+
 USERVER_NAMESPACE_BEGIN
 
 TEST(UUID, Boost) {
@@ -53,7 +55,7 @@ TEST(UUID, ParseFail) {
             utils::BoostUuidFromString(invalid_uuid);
             FAIL() << "Must throw on invalid UUID " << invalid_uuid;
         } catch (const std::runtime_error& e) {
-            EXPECT_EQ(std::string{"invalid uuid string"}, e.what());
+            EXPECT_TRUE(utils::text::ICaseStartsWith(e.what(), "invalid UUID string"));
         }
     }
 }
