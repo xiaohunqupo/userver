@@ -1,4 +1,4 @@
-include_guard(GLOBAL)
+include_guard(DIRECTORY)
 
 if(USERVER_USE_STATIC_LIBS)
   set(OPENSSL_USE_STATIC_LIBS ON)

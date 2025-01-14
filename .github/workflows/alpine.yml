@@ -91,7 +91,6 @@ jobs:
                 CMAKE_PROGRAM_PATH=/usr/lib/llvm17/bin/ \
                 cmake -S . -B build_debug \
                     -DCMAKE_BUILD_TYPE=Debug \
-                    -DUSERVER_USE_STATIC_LIBS=1 \
                     -DUSERVER_USE_LD=lld \
                     -DUSERVER_NO_WERROR=OFF \
                     -DUSERVER_BUILD_ALL_COMPONENTS=1 \
