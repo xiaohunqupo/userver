@@ -109,4 +109,25 @@ TEST(DumpOperationsFile, Underread) {
     FAIL();
 }
 
+TEST(DumpOperationsFile, ReadBackUp) {
+    const auto file = fs::blocking::TempFile::Create();
+    fs::blocking::RewriteFileContents(file.GetPath(), "abcdefg");
+
+    dump::FileReader reader(file.GetPath());
+    EXPECT_EQ(dump::ReadUnsafeAtMost(reader, 3), "abc");
+
+    dump::BackUpReadUnsafe(reader, 2);
+    EXPECT_EQ(dump::ReadUnsafeAtMost(reader, 4), "bcde");
+
+    dump::BackUpReadUnsafe(reader, 4);
+    EXPECT_EQ(dump::ReadUnsafeAtMost(reader, 5), "bcdef");
+
+    EXPECT_EQ(dump::ReadUnsafeAtMost(reader, 1), "g");
+
+    dump::BackUpReadUnsafe(reader, 1);
+    EXPECT_EQ(dump::ReadUnsafeAtMost(reader, 1), "g");
+
+    UEXPECT_NO_THROW(reader.Finish());
+}
+
 USERVER_NAMESPACE_END
