@@ -17,7 +17,10 @@ namespace {
 
 std::string AsJsonString(const google::protobuf::Message& message) {
     grpc::string output;
-    google::protobuf::util::MessageToJsonString(message, &output);
+    const auto status = google::protobuf::util::MessageToJsonString(message, &output);
+    if (!status.ok()) {
+        throw std::runtime_error(status.ToString());
+    }
     return ugrpc::impl::ToString(output);
 }
 
