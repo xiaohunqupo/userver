@@ -183,6 +183,19 @@ if (USERVER_FEATURE_JEMALLOC AND NOT USERVER_SANITIZE AND NOT CMAKE_SYSTEM_NAME 
   endif()
 endif()
 
+option(USERVER_FEATURE_RE2 "Build userver with re2 support" OFF)
+if(USERVER_FEATURE_RE2)
+  if(USERVER_CONAN)
+    find_package(re2 REQUIRED CONFIG)
+    target_link_libraries(${PROJECT_NAME} PRIVATE re2::re2)
+  else()
+    find_package(re2 REQUIRED)
+    target_link_libraries(${PROJECT_NAME} PRIVATE re2)
+  endif()
+else()
+  target_compile_definitions(${PROJECT_NAME} PUBLIC USERVER_NO_RE2_SUPPORT=1)
+endif()
+
 target_compile_definitions(${PROJECT_NAME} PRIVATE
   CRYPTOPP_ENABLE_NAMESPACE_WEAK=1
 )

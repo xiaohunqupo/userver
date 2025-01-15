@@ -25,6 +25,7 @@ openldap
 openssl
 postgresql@16
 pugixml
+re2
 rocksdb
 yaml-cpp
 zlib
