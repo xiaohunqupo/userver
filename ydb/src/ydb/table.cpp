@@ -64,19 +64,25 @@ TableClient::TableClient(
                                             : impl::kDefaultPerQueryBounds
       )),
       driver_(std::move(driver)) {
-    NYdb::NTable::TSessionPoolSettings session_config;
-    session_config.MaxActiveSessions(settings.max_pool_size).MinPoolSize(settings.min_pool_size);
-    session_config.RetryLimit(settings.get_session_retry_limit);
+    {
+        NYdb::NTable::TSessionPoolSettings session_pool_settings;
+        session_pool_settings.MaxActiveSessions(settings.max_pool_size)
+            .MinPoolSize(settings.min_pool_size)
+            .RetryLimit(settings.get_session_retry_limit);
+        NYdb::NTable::TClientSettings client_settings;
+        client_settings.SessionPoolSettings(session_pool_settings);
+        table_client_ = std::make_unique<NYdb::NTable::TTableClient>(driver_->GetNativeDriver(), client_settings);
+        scheme_client_ = std::make_unique<NYdb::NScheme::TSchemeClient>(driver_->GetNativeDriver(), client_settings);
+    }
 
-    NYdb::NTable::TClientSettings client_config;
-    client_config.SessionPoolSettings(session_config);
+    {
+        NYdb::NQuery::TSessionPoolSettings session_pool_settings;
+        session_pool_settings.MaxActiveSessions(settings.max_pool_size).MinPoolSize(settings.min_pool_size);
+        NYdb::NQuery::TClientSettings client_settings;
+        client_settings.SessionPoolSettings(session_pool_settings);
+        query_client_ = std::make_unique<NYdb::NQuery::TQueryClient>(driver_->GetNativeDriver(), client_settings);
+    }
 
-    NYdb::NQuery::TClientSettings query_client_config;
-    client_config.SessionPoolSettings(session_config);
-
-    table_client_ = std::make_unique<NYdb::NTable::TTableClient>(driver_->GetNativeDriver(), client_config);
-    scheme_client_ = std::make_unique<NYdb::NScheme::TSchemeClient>(driver_->GetNativeDriver(), client_config);
-    query_client_ = std::make_unique<NYdb::NQuery::TQueryClient>(driver_->GetNativeDriver(), query_client_config);
     if (settings.sync_start) {
         LOG_DEBUG() << "Synchronously starting ydb client with name '" << driver_->GetDbName() << "'";
         Select1();
