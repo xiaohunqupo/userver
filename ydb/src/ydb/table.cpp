@@ -352,7 +352,7 @@ TableClient::ExecuteQuery(OperationSettings settings, const Query& query, Prepar
 }
 
 ExecuteResponse TableClient::ExecuteQuery(
-    NYdb::NQuery::TExecuteQuerySettings&& query_settings,
+    NYdb::NQuery::TExecuteQuerySettings&& exec_settings,
     OperationSettings settings,
     const Query& query,
     PreparedArgsBuilder&& builder
@@ -366,17 +366,17 @@ ExecuteResponse TableClient::ExecuteQuery(
 
     impl::RequestContext context{*this, query, settings};
 
-    auto future = impl::RetryQueryOperation(
+    auto future = impl::RetryQuery(
         context,
         [query = query.Statement(),
          params = std::move(builder).Build(),
-         query_settings = std::move(query_settings),
+         exec_settings = std::move(exec_settings),
          settings = std::move(settings),
          deadline = context.deadline](NYdb::NQuery::TSession session) mutable {
-            impl::ApplyToRequestSettings(query_settings, settings, deadline);
+            impl::ApplyToRequestSettings(exec_settings, settings, deadline);
             const auto tx_settings = PrepareQueryTxSettings(settings);
             const auto tx = NYdb::NQuery::TTxControl::BeginTx(tx_settings).CommitTx();
-            return session.ExecuteQuery(impl::ToString(query), tx, params, query_settings);
+            return session.ExecuteQuery(impl::ToString(query), tx, params, exec_settings);
         }
     );
 
