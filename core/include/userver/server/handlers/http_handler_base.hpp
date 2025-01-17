@@ -3,6 +3,7 @@
 /// @file userver/server/handlers/http_handler_base.hpp
 /// @brief @copybrief server::handlers::HttpHandlerBase
 
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -12,16 +13,22 @@
 #include <userver/utils/statistics/entry.hpp>
 #include <userver/utils/token_bucket.hpp>
 
-#include <userver/server/handlers/auth/auth_checker_base.hpp>
 #include <userver/server/handlers/exceptions.hpp>
 #include <userver/server/handlers/formatted_error_data.hpp>
 #include <userver/server/handlers/handler_base.hpp>
 #include <userver/server/http/http_request.hpp>
 #include <userver/server/http/http_response.hpp>
 #include <userver/server/http/http_response_body_stream_fwd.hpp>
-#include <userver/server/request/request_base.hpp>
+// Not needed here, but a lot of code depends on it being included transitively
+#include <userver/tracing/span.hpp>
 
 USERVER_NAMESPACE_BEGIN
+
+namespace server::middlewares {
+class HttpMiddlewareBase;
+class HandlerAdapter;
+class Auth;
+}  // namespace server::middlewares
 
 /// @brief Most common \ref userver_http_handlers "userver HTTP handlers"
 namespace server::handlers {
@@ -45,127 +52,168 @@ class HttpHandlerStatisticsScope;
 /// Name | Description | Default value
 /// ---- | ----------- | -------------
 /// log-level | overrides log level for this handle | <no override>
+/// status-codes-log-level | map of "status": log_level items to override span log level for specific status codes | {}
+/// middlewares.pipeline-builder | name of a component to build a middleware pipeline for this particular handler | default-handler-middleware-pipeline-builder
 ///
 /// ## Example usage:
 ///
-/// @snippet samples/hello_service/hello_service.cpp Hello service sample - component
+/// @include samples/hello_service/src/hello_handler.hpp
+/// @include samples/hello_service/src/hello_handler.cpp
 
 // clang-format on
 
 class HttpHandlerBase : public HandlerBase {
- public:
-  HttpHandlerBase(const components::ComponentConfig& config,
-                  const components::ComponentContext& component_context,
-                  bool is_monitor = false);
+public:
+    HttpHandlerBase(
+        const components::ComponentConfig& config,
+        const components::ComponentContext& component_context,
+        bool is_monitor = false
+    );
 
-  ~HttpHandlerBase() override;
+    ~HttpHandlerBase() override;
 
-  void HandleRequest(request::RequestBase& request,
-                     request::RequestContext& context) const override;
-  void ReportMalformedRequest(request::RequestBase& request) const final;
+    void PrepareAndHandleRequest(http::HttpRequest& request, request::RequestContext& context) const override;
 
-  virtual const std::string& HandlerName() const;
+    void ReportMalformedRequest(http::HttpRequest& request) const final;
 
-  const std::vector<http::HttpMethod>& GetAllowedMethods() const;
+    virtual const std::string& HandlerName() const;
 
-  /// @cond
-  // For internal use only.
-  HttpHandlerStatistics& GetHandlerStatistics() const;
+    const std::vector<http::HttpMethod>& GetAllowedMethods() const;
 
-  // For internal use only.
-  HttpRequestStatistics& GetRequestStatistics() const;
-  /// @endcond
+    /// @cond
+    // For internal use only.
+    HttpHandlerStatistics& GetHandlerStatistics() const;
 
-  /// Override it if you need a custom logging level for messages about finish
-  /// of request handling for some http statuses.
-  virtual logging::Level GetLogLevelForResponseStatus(
-      http::HttpStatus status) const;
+    // For internal use only.
+    HttpRequestStatistics& GetRequestStatistics() const;
+    /// @endcond
 
-  virtual FormattedErrorData GetFormattedExternalErrorBody(
-      const CustomHandlerException& exc) const;
+    /// Override it if you need a custom logging level for messages about finish
+    /// of request handling for some http statuses.
+    virtual logging::Level GetLogLevelForResponseStatus(http::HttpStatus status) const;
 
-  std::string GetResponseDataForLoggingChecked(
-      const http::HttpRequest& request, request::RequestContext& context,
-      const std::string& response_data) const;
+    virtual FormattedErrorData GetFormattedExternalErrorBody(const CustomHandlerException& exc) const;
 
-  static yaml_config::Schema GetStaticConfigSchema();
+    std::string GetResponseDataForLoggingChecked(
+        const http::HttpRequest& request,
+        request::RequestContext& context,
+        const std::string& response_data
+    ) const;
 
- protected:
-  [[noreturn]] void ThrowUnsupportedHttpMethod(
-      const http::HttpRequest& request) const;
+    /// Takes the exception and formats it into response, as specified by
+    /// exception.
+    void HandleCustomHandlerException(const http::HttpRequest& request, const CustomHandlerException& ex) const;
 
-  virtual std::string HandleRequestThrow(
-      const http::HttpRequest& request, request::RequestContext& context) const;
+    /// Takes the exception and formats it into response as an internal server
+    /// error.
+    void HandleUnknownException(const http::HttpRequest& request, const std::exception& ex) const;
 
-  virtual void OnRequestCompleteThrow(
-      const http::HttpRequest& /*request*/,
-      request::RequestContext& /*context*/) const {}
+    /// Helper function to log an unknown exception
+    void LogUnknownException(const std::exception& ex, std::optional<logging::Level> log_level_override = {}) const;
 
-  virtual void HandleStreamRequest(const server::http::HttpRequest&,
-                                   server::request::RequestContext&,
-                                   server::http::ResponseBodyStream&) const;
+    /// Returns the default log level for the handler
+    const std::optional<logging::Level>& GetLogLevel() const;
 
-  virtual bool IsStreamed() const { return is_body_streamed_; }
+    static yaml_config::Schema GetStaticConfigSchema();
 
-  /// Override it to show per HTTP-method statistics besides statistics for all
-  /// methods
-  virtual bool IsMethodStatisticIncluded() const { return false; }
+protected:
+    [[noreturn]] void ThrowUnsupportedHttpMethod(const http::HttpRequest& request) const;
 
-  /// Override it if you want to disable auth checks in handler by some
-  /// condition
-  virtual bool NeedCheckAuth() const { return true; }
+    /// Same as `HandleRequest`.
+    virtual std::string HandleRequestThrow(const http::HttpRequest& request, request::RequestContext& context) const;
 
-  /// Override it if you need a custom request body logging.
-  virtual std::string GetRequestBodyForLogging(
-      const http::HttpRequest& request, request::RequestContext& context,
-      const std::string& request_body) const;
+    /// The core method for HTTP request handling.
+    /// `request` arg contains HTTP headers, full body, etc.
+    /// The method should return response body.
+    /// @note It is used only if IsStreamed() returned `false`.
+    virtual std::string HandleRequest(http::HttpRequest& request, request::RequestContext& context) const;
 
-  /// Override it if you need a custom response data logging.
-  virtual std::string GetResponseDataForLogging(
-      const http::HttpRequest& request, request::RequestContext& context,
-      const std::string& response_data) const;
+    /// The core method for HTTP request handling.
+    /// `request` arg contains HTTP headers, full body, etc.
+    /// The response body is passed in parts to `ResponseBodyStream`.
+    /// Stream transmission is useful when:
+    /// 1) The body size is unknown beforehand.
+    /// 2) The client may take advantage of early body transmission
+    ///    (e.g. a Web Browser may start rendering the HTML page
+    ///     or downloading dependant resources).
+    /// 3) The body size is huge and we want to have only a part of it
+    ///    in memory.
+    /// @note It is used only if IsStreamed() returned `true`.
+    virtual void
+    HandleStreamRequest(server::http::HttpRequest&, server::request::RequestContext&, server::http::ResponseBodyStream&)
+        const;
 
-  /// For internal use. You don't need to override it. This method is overriden
-  /// in format-specific base handlers.
-  virtual void ParseRequestData(const http::HttpRequest&,
-                                request::RequestContext&) const {}
+    /// If IsStreamed() returns `true`, call HandleStreamRequest()
+    /// for request handling, HandleRequest() is not called.
+    /// If it returns `false`, HandleRequest() is called instead,
+    /// and HandleStreamRequest() is not called.
+    /// @note The default implementation returns the cached value of
+    /// "response-body-streamed" value from static config.
+    virtual bool IsStreamed() const { return is_body_streamed_; }
 
-  virtual std::string GetMetaType(const http::HttpRequest&) const;
+    /// Override it to show per HTTP-method statistics besides statistics for all
+    /// methods
+    virtual bool IsMethodStatisticIncluded() const { return false; }
 
- private:
-  std::string GetRequestBodyForLoggingChecked(
-      const http::HttpRequest& request, request::RequestContext& context,
-      const std::string& request_body) const;
+    /// Override it if you want to disable auth checks in handler by some
+    /// condition
+    virtual bool NeedCheckAuth() const { return true; }
 
-  void CheckAuth(const http::HttpRequest& http_request,
-                 request::RequestContext& context) const;
+    /// Override it if you need a custom request body logging.
+    virtual std::string GetRequestBodyForLogging(
+        const http::HttpRequest& request,
+        request::RequestContext& context,
+        const std::string& request_body
+    ) const;
 
-  void CheckRatelimit(const http::HttpRequest& http_request) const;
+    /// Override it if you need a custom response data logging.
+    virtual std::string GetResponseDataForLogging(
+        const http::HttpRequest& request,
+        request::RequestContext& context,
+        const std::string& response_data
+    ) const;
 
-  void DecompressRequestBody(http::HttpRequest& http_request) const;
+    /// For internal use. You don't need to override it. This method is overridden
+    /// in format-specific base handlers.
+    virtual void ParseRequestData(const http::HttpRequest&, request::RequestContext&) const {}
 
-  formats::json::ValueBuilder ExtendStatistics(
-      const utils::statistics::StatisticsRequest&);
+    virtual std::string GetMetaType(const http::HttpRequest&) const;
 
-  template <typename HttpStatistics>
-  formats::json::ValueBuilder FormatStatistics(const HttpStatistics& stats);
+private:
+    friend class middlewares::HandlerAdapter;
+    friend class middlewares::Auth;
 
-  void SetResponseAcceptEncoding(http::HttpResponse& response) const;
-  void SetResponseServerHostname(http::HttpResponse& response) const;
+    void HandleHttpRequest(http::HttpRequest& request, request::RequestContext& context) const;
 
-  const dynamic_config::Source config_source_;
-  const std::vector<http::HttpMethod> allowed_methods_;
-  const std::string handler_name_;
-  utils::statistics::Entry statistics_holder_;
+    void HandleRequestStream(http::HttpRequest& http_request, request::RequestContext& context) const;
 
-  std::unique_ptr<HttpHandlerStatistics> handler_statistics_;
-  std::unique_ptr<HttpRequestStatistics> request_statistics_;
-  std::vector<auth::AuthCheckerBasePtr> auth_checkers_;
+    std::string GetRequestBodyForLoggingChecked(
+        const http::HttpRequest& request,
+        request::RequestContext& context,
+        const std::string& request_body
+    ) const;
 
-  std::optional<logging::Level> log_level_;
-  bool set_response_server_hostname_;
-  mutable utils::TokenBucket rate_limit_;
-  bool is_body_streamed_;
+    template <typename HttpStatistics>
+    void FormatStatistics(utils::statistics::Writer result, const HttpStatistics& stats);
+
+    void SetResponseServerHostname(http::HttpResponse& response) const;
+
+    void BuildMiddlewarePipeline(const components::ComponentConfig&, const components::ComponentContext&);
+
+    const dynamic_config::Source config_source_;
+    const std::vector<http::HttpMethod> allowed_methods_;
+    const std::string handler_name_;
+    utils::statistics::Entry statistics_holder_;
+    std::optional<logging::Level> log_level_;
+    std::unordered_map<int, logging::Level> log_level_for_status_codes_;
+
+    std::unique_ptr<HttpHandlerStatistics> handler_statistics_;
+    std::unique_ptr<HttpRequestStatistics> request_statistics_;
+
+    bool set_response_server_hostname_;
+    bool is_body_streamed_;
+
+    std::unique_ptr<middlewares::HttpMiddlewareBase> first_middleware_;
 };
 
 }  // namespace server::handlers

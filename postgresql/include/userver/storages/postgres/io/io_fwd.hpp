@@ -1,5 +1,9 @@
 #pragma once
 
+/// @file userver/storages/postgres/io/io_fwd.hpp
+/// @brief Forward declarations of types for PostgreSQL mappings.
+/// @ingroup userver_postgres_parse_and_format
+
 USERVER_NAMESPACE_BEGIN
 
 namespace storages::postgres::io {
@@ -18,7 +22,7 @@ struct CppToSystemPg;
 /// `static constexpr EnumeratorList enumerators` member. The EnumeratorList
 /// is a type alias declared in EnumMappingBase.
 ///
-/// For more information see @ref pg_enum
+/// For more information see @ref scripts/docs/en/userver/pg_user_types.md
 template <typename T>
 struct CppToUserPg;
 

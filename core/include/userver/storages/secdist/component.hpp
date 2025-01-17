@@ -1,11 +1,11 @@
 #pragma once
 
-/// @file storages/secdist/component.hpp
+/// @file userver/storages/secdist/component.hpp
 /// @brief @copybrief components::Secdist
 
 #include <string>
 
-#include <userver/components/loggable_component_base.hpp>
+#include <userver/components/component_base.hpp>
 #include <userver/storages/secdist/secdist.hpp>
 
 USERVER_NAMESPACE_BEGIN
@@ -19,38 +19,46 @@ namespace components {
 ///
 /// The component must be configured in service config.
 ///
+/// Secdist requires a provider storages::secdist::SecdistProvider
+/// You can implement your own or use components::DefaultSecdistProvider
+///
+/// ## Static configuration example:
+///
+/// @snippet samples/redis_service/static_config.yaml Sample secdist static config
+///
 /// ## Static options:
 /// Name | Description | Default value
 /// ---- | ----------- | -------------
-/// config | path to the config file with data | ''
-/// format | config format, either `json` or `yaml` | 'json'
-/// missing-ok | do not terminate components load if no file found by the config option | false
-/// environment-secrets-key | name of environment variable from which to load additional data | -
+/// provider | optional secdist provider component name | 'default-secdist-provider'
 /// update-period | period between data updates in utils::StringToDuration() suitable format ('0s' for no updates) | 0s
-/// blocking-task-processor | name of task processor for background blocking operations | --
 
 // clang-format on
 
-class Secdist final : public LoggableComponentBase {
- public:
-  static constexpr std::string_view kName = "secdist";
+class Secdist final : public ComponentBase {
+public:
+    /// @ingroup userver_component_names
+    /// @brief The default name of components::Secdist
+    static constexpr std::string_view kName = "secdist";
 
-  Secdist(const ComponentConfig&, const ComponentContext&);
+    Secdist(const ComponentConfig&, const ComponentContext&);
 
-  const storages::secdist::SecdistConfig& Get() const;
+    const storages::secdist::SecdistConfig& Get() const;
 
-  rcu::ReadablePtr<storages::secdist::SecdistConfig> GetSnapshot() const;
+    rcu::ReadablePtr<storages::secdist::SecdistConfig> GetSnapshot() const;
 
-  storages::secdist::Secdist& GetStorage();
+    storages::secdist::Secdist& GetStorage();
 
-  static yaml_config::Schema GetStaticConfigSchema();
+    static yaml_config::Schema GetStaticConfigSchema();
 
- private:
-  storages::secdist::Secdist secdist_;
+private:
+    storages::secdist::Secdist secdist_;
 };
 
 template <>
 inline constexpr bool kHasValidate<Secdist> = true;
+
+template <>
+inline constexpr auto kConfigFileMode<Secdist> = ConfigFileMode::kNotRequired;
 
 }  // namespace components
 

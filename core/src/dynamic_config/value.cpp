@@ -1,84 +1,84 @@
 #include <userver/dynamic_config/value.hpp>
 
-#include <type_traits>
+#include <stdexcept>
+
+#include <fmt/format.h>
 
 #include <userver/formats/json/serialize.hpp>
 #include <userver/formats/json/value_builder.hpp>
-#include <userver/logging/logger.hpp>
 
 USERVER_NAMESPACE_BEGIN
 
 namespace dynamic_config {
 
-formats::json::Value DocsMap::Get(const std::string& name) const {
-  const auto it = docs_.find(name);
-  if (it == docs_.end()) {
-    throw std::runtime_error("Can't find doc for '" + name + "'");
-  }
+formats::json::Value DocsMap::Get(std::string_view name) const {
+    const auto it = utils::impl::FindTransparent(docs_, name);
+    if (it == docs_.end()) {
+        throw std::runtime_error(fmt::format("Can't find doc for '{}'", name));
+    }
 
-  requested_names_.insert(name);
-  return it->second;
+    const auto used_it = utils::impl::FindTransparent(configs_to_be_used_, name);
+
+    if (used_it != configs_to_be_used_.end()) {
+        configs_to_be_used_.erase(used_it);
+    }
+
+    return it->second;
 }
+
+bool DocsMap::Has(std::string_view name) const { return utils::impl::FindTransparent(docs_, name) != docs_.end(); }
 
 void DocsMap::Set(std::string name, formats::json::Value obj) {
-  auto it = docs_.find(name);
-  if (it != docs_.end()) {
-    it->second = obj;
-  } else {
-    docs_.emplace(std::move(name), std::move(obj));
-  }
+    utils::impl::TransparentInsertOrAssign(docs_, std::move(name), std::move(obj));
 }
 
-void DocsMap::Parse(const std::string& json_string, bool empty_ok) {
-  auto json = formats::json::FromString(json_string);
+void DocsMap::Remove(const std::string& name) { docs_.erase(name); }
 
-  if (!empty_ok && json.GetSize() == 0)
-    throw std::runtime_error("DocsMap::Parse failed: json is empty");
+void DocsMap::Parse(std::string_view json_string, bool empty_ok) {
+    Parse(formats::json::FromString(json_string), empty_ok);
+}
 
-  for (const auto& [name, value] : Items(json)) {
-    formats::json::ValueBuilder builder;
+void DocsMap::Parse(formats::json::Value json, bool empty_ok) {
+    json.CheckObject();
+    if (!empty_ok && json.GetSize() == 0) {
+        throw std::runtime_error("DocsMap::Parse failed: json is empty");
+    }
 
-    /* Use fake [name] magic to pass the json path into DocsMap
-     * to ease debugging of bad default value
-     */
-    builder[name] = value;
-    Set(name, builder.ExtractValue()[name]);
-  }
+    // Erase the origin of 'json' from error messages of configs parsing.
+    json.DropRootPath();
+
+    for (auto [name, value] : Items(std::move(json))) {
+        Set(std::move(name), value);
+    }
 }
 
 size_t DocsMap::Size() const { return docs_.size(); }
 
-void DocsMap::MergeFromOther(DocsMap&& other) {
-  auto new_docs = std::move(other.docs_);
-  new_docs.merge(std::move(docs_));
-  docs_ = std::move(new_docs);
+void DocsMap::MergeOrAssign(DocsMap&& source) {
+    auto new_docs = std::move(source.docs_);
+    new_docs.merge(std::move(docs_));
+    docs_ = std::move(new_docs);
 }
 
-const std::unordered_set<std::string>& DocsMap::GetRequestedNames() const {
-  return requested_names_;
-}
+void DocsMap::MergeMissing(const DocsMap& source) { docs_.insert(source.docs_.begin(), source.docs_.end()); }
 
 std::unordered_set<std::string> DocsMap::GetNames() const {
-  std::unordered_set<std::string> names;
-  for (const auto& [k, v] : docs_) names.insert(k);
-  return names;
+    std::unordered_set<std::string> names;
+    for (const auto& [k, v] : docs_) names.insert(k);
+    return names;
 }
 
-std::string DocsMap::AsJsonString() const {
-  formats::json::ValueBuilder body_builder(formats::json::Type::kObject);
+formats::json::Value DocsMap::AsJson() const { return formats::json::ValueBuilder{docs_}.ExtractValue(); }
 
-  for (const auto& [key, value] : docs_) {
-    body_builder[key] = value;
-  }
+bool DocsMap::AreContentsEqual(const DocsMap& other) const { return docs_ == other.docs_; }
 
-  return formats::json::ToString(body_builder.ExtractValue());
+void DocsMap::SetConfigsExpectedToBeUsed(utils::impl::TransparentSet<std::string> configs, utils::impl::InternalTag) {
+    configs_to_be_used_ = std::move(configs);
 }
 
-bool DocsMap::AreContentsEqual(const DocsMap& other) const {
-  return docs_ == other.docs_;
+const utils::impl::TransparentSet<std::string>& DocsMap::GetConfigsExpectedToBeUsed(utils::impl::InternalTag) const {
+    return configs_to_be_used_;
 }
-
-const std::string kValueDictDefaultName = "__default__";
 
 }  // namespace dynamic_config
 

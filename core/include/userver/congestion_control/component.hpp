@@ -3,8 +3,10 @@
 /// @file userver/congestion_control/component.hpp
 /// @brief @copybrief congestion_control::Component
 
-#include <userver/components/loggable_component_base.hpp>
+#include <userver/components/component_base.hpp>
 #include <userver/dynamic_config/snapshot.hpp>
+#include <userver/server/congestion_control/limiter.hpp>
+#include <userver/server/congestion_control/sensor.hpp>
 #include <userver/utils/fast_pimpl.hpp>
 #include <userver/utils/statistics/entry.hpp>
 
@@ -18,7 +20,7 @@ namespace congestion_control {
 ///
 /// @brief Component to limit too active requests, also known as CC.
 ///
-/// ## Dynamic config
+/// ## congestion_control::Component Dynamic config
 /// * @ref USERVER_RPS_CCONTROL
 /// * @ref USERVER_RPS_CCONTROL_ENABLED
 ///
@@ -36,35 +38,37 @@ namespace congestion_control {
 
 // clang-format on
 
-class Component final : public components::LoggableComponentBase {
- public:
-  static constexpr std::string_view kName = "congestion-control";
+class Component final : public components::ComponentBase {
+public:
+    /// @ingroup userver_component_names
+    /// @brief The default name of congestion_control::Component component
+    static constexpr std::string_view kName = "congestion-control";
 
-  Component(const components::ComponentConfig&,
-            const components::ComponentContext&);
+    Component(const components::ComponentConfig&, const components::ComponentContext&);
 
-  ~Component() override;
+    ~Component() override;
 
-  static yaml_config::Schema GetStaticConfigSchema();
+    static yaml_config::Schema GetStaticConfigSchema();
 
- private:
-  void OnConfigUpdate(const dynamic_config::Snapshot& cfg);
+    server::congestion_control::Limiter& GetServerLimiter();
+    server::congestion_control::Sensor& GetServerSensor();
 
-  void OnAllComponentsLoaded() override;
+private:
+    void OnConfigUpdate(const dynamic_config::Snapshot& cfg);
 
-  void OnAllComponentsAreStopping() override;
+    void OnAllComponentsLoaded() override;
 
-  formats::json::Value ExtendStatistics(
-      const utils::statistics::StatisticsRequest& /*request*/);
+    void OnAllComponentsAreStopping() override;
 
-  struct Impl;
-  utils::FastPimpl<Impl, 560, 8> pimpl_;
+    void ExtendWriter(utils::statistics::Writer& writer);
+
+    struct Impl;
+    utils::FastPimpl<Impl, 704, 16> pimpl_;
 };
 
 }  // namespace congestion_control
 
 template <>
-inline constexpr bool components::kHasValidate<congestion_control::Component> =
-    true;
+inline constexpr bool components::kHasValidate<congestion_control::Component> = true;
 
 USERVER_NAMESPACE_END

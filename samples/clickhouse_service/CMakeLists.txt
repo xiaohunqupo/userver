@@ -1,10 +1,11 @@
+cmake_minimum_required(VERSION 3.14)
 project(userver-samples-clickhouse_service CXX)
 
-add_executable(${PROJECT_NAME} "clickhouse_service.cpp")
-target_link_libraries(${PROJECT_NAME} userver-core userver-clickhouse)
+find_package(userver COMPONENTS clickhouse REQUIRED)
 
-userver_sample_testsuite_add()
-if (TARGET testsuite-${PROJECT_NAME})
-  set_tests_properties(testsuite-${PROJECT_NAME} PROPERTIES ENVIRONMENT
-          "TESTSUITE_CLICKHOUSE_SERVER_START_TIMEOUT=10.0")
-endif()
+add_executable(${PROJECT_NAME} "clickhouse_service.cpp")
+target_link_libraries(${PROJECT_NAME} userver::clickhouse)
+
+userver_testsuite_add_simple(
+    TEST_ENV "TESTSUITE_CLICKHOUSE_SERVER_START_TIMEOUT=120.0"
+)

@@ -1,101 +1,133 @@
-#include <userver/storages/redis/impl/request.hpp>
+#include <storages/redis/impl/request.hpp>
 
-#include <userver/tracing/span.hpp>
+#include <userver/tracing/in_place_span.hpp>
 
-#include <userver/storages/redis/impl/exception.hpp>
-#include <userver/storages/redis/impl/reply.hpp>
-#include <userver/storages/redis/impl/sentinel.hpp>
-#include "redis.hpp"
+#include <userver/storages/redis/exception.hpp>
+#include <userver/storages/redis/reply.hpp>
+
+#include <storages/redis/impl/command.hpp>
+#include <storages/redis/impl/sentinel.hpp>
+
+#include "command_control_impl.hpp"
 
 USERVER_NAMESPACE_BEGIN
 
-namespace redis {
+namespace storages::redis::impl {
 
 namespace {
+
+class ReplyState {
+public:
+    explicit ReplyState(std::string&& span_name) : span_(std::move(span_name)) { span_.Get().DetachFromCoroStack(); }
+
+    ~ReplyState() {
+        if (!executed_) {
+            LOG_WARNING() << "A request has been dropped";
+        }
+    }
+
+    engine::Promise<ReplyPtr>& Promise() { return promise_; }
+    tracing::Span& Span() { return span_.Get(); }
+    size_t GetRepliesToSkip() const { return replies_to_skip_; }
+    void SetRepliesToSkip(size_t value) { replies_to_skip_ = value; }
+    void SetExecuted() { executed_ = true; }
+
+private:
+    engine::Promise<ReplyPtr> promise_;
+    tracing::InPlaceSpan span_;
+    size_t replies_to_skip_{0};
+    bool executed_{false};
+};
+
 std::string MakeSpanName(const CmdArgs& cmd_args) {
-  if (cmd_args.args.empty() || cmd_args.args.front().empty()) {
-    return "redis_unknown";
-  }
+    if (cmd_args.args.empty() || cmd_args.args.front().empty()) {
+        return "redis_unknown";
+    }
 
-  if (cmd_args.args.size() > 1) {
-    return "redis_multi";
-  }
+    if (cmd_args.args.size() > 1) {
+        return "redis_multi";
+    }
 
-  return "redis_" + cmd_args.args.front().front();
+    return "redis_" + cmd_args.args.front().front();
 }
+
 }  // namespace
 
-Request::Request(Sentinel& sentinel, CmdArgs&& args, const std::string& key,
-                 bool master, const CommandControl& command_control,
-                 size_t replies_to_skip) {
-  CommandPtr command_ptr = PrepareRequest(std::forward<CmdArgs>(args),
-                                          command_control, replies_to_skip);
-  sentinel.AsyncCommand(command_ptr, key, master);
+Request::Request(
+    Sentinel& sentinel,
+    CmdArgs&& args,
+    const std::string& key,
+    bool master,
+    const CommandControl& command_control,
+    size_t replies_to_skip
+) {
+    CommandPtr command_ptr = PrepareRequest(std::forward<CmdArgs>(args), command_control, replies_to_skip);
+    sentinel.AsyncCommand(std::move(command_ptr), key, master);
 }
 
-Request::Request(Sentinel& sentinel, CmdArgs&& args, size_t shard, bool master,
-                 const CommandControl& command_control,
-                 size_t replies_to_skip) {
-  CommandPtr command_ptr = PrepareRequest(std::forward<CmdArgs>(args),
-                                          command_control, replies_to_skip);
-  sentinel.AsyncCommand(command_ptr, master, shard);
+Request::Request(
+    Sentinel& sentinel,
+    CmdArgs&& args,
+    size_t shard,
+    bool master,
+    const CommandControl& command_control,
+    size_t replies_to_skip
+) {
+    CommandPtr command_ptr = PrepareRequest(std::forward<CmdArgs>(args), command_control, replies_to_skip);
+    sentinel.AsyncCommand(std::move(command_ptr), master, shard);
 }
 
-Request::Request(Sentinel& sentinel, CmdArgs&& args, size_t shard, bool master,
-                 const CommandControl& command_control,
-                 redis::ReplyCallback&& callback) {
-  CommandPtr command_ptr = PrepareCommand(std::forward<CmdArgs>(args),
-                                          std::move(callback), command_control);
-  sentinel.AsyncCommand(command_ptr, master, shard);
+CommandPtr Request::PrepareRequest(CmdArgs&& args, const CommandControl& command_control, size_t replies_to_skip) {
+    deadline_ = engine::Deadline::FromDuration(CommandControlImpl{command_control}.timeout_all);
+
+    // Sadly, we don't have std::move_only_function, so we need a shared_ptr.
+    auto state_ptr = std::make_shared<ReplyState>(MakeSpanName(args));
+    state_ptr->SetRepliesToSkip(replies_to_skip);
+    future_ = state_ptr->Promise().get_future();
+
+    auto command = PrepareCommand(
+        std::move(args),
+        [state_ptr = std::move(state_ptr)](const CommandPtr&, ReplyPtr reply) mutable {
+            if (!state_ptr) {
+                LOG_LIMITED_WARNING() << "redis::Command keeps running after "
+                                         "triggering the callback initially";
+                return;
+            }
+
+            state_ptr->SetExecuted();
+
+            if (state_ptr->GetRepliesToSkip() != 0) {
+                state_ptr->SetRepliesToSkip(state_ptr->GetRepliesToSkip() - 1);
+                if (reply->data.IsStatus()) return;
+            }
+
+            reply->FillSpanTags(state_ptr->Span());
+            LOG_TRACE() << "Got reply from redis" << tracing::impl::LogSpanAsLastNoCurrent{state_ptr->Span()};
+
+            state_ptr->Promise().set_value(std::move(reply));
+            state_ptr.reset();
+        },
+        command_control
+    );
+    return command;
 }
 
-CommandPtr Request::PrepareRequest(CmdArgs&& args,
-                                   const CommandControl& command_control,
-                                   size_t replies_to_skip) {
-  request_future_.until_ =
-      std::chrono::steady_clock::now() + command_control.timeout_all;
-  request_future_.span_ptr_ =
-      std::make_shared<tracing::Span>(MakeSpanName(args));
-  request_future_.span_ptr_->DetachFromCoroStack();
-  auto command = PrepareCommand(
-      std::move(args),
-      [replies_to_skip, span_ptr = request_future_.span_ptr_](
-          const CommandPtr&, ReplyPtr reply, ReplyPtrPromise& prom) mutable {
-        if (replies_to_skip) {
-          --replies_to_skip;
-          if (reply->data.IsStatus()) return;
-        }
-        if (span_ptr) {
-          reply->FillSpanTags(*span_ptr);
-          LOG_TRACE() << "Got reply from redis" << *span_ptr;
-        }
-        prom.set_value(std::move(reply));
-      },
-      command_control);
-  request_future_.ro_future_ = command->promise.get_future();
-  return command;
+ReplyPtr Request::Get() {
+    switch (future_.wait_until(deadline_)) {
+        case engine::FutureStatus::kReady:
+            return future_.get();
+
+        case engine::FutureStatus::kTimeout:
+            return std::make_shared<Reply>(std::string(), nullptr, ReplyStatus::kTimeoutError);
+
+        case engine::FutureStatus::kCancelled:
+            throw RequestCancelledException("Redis request wait was aborted due to task cancellation");
+    }
+    UINVARIANT(false, "Invalid FutureStatus enum value");
 }
 
-ReplyPtr RequestFuture::Get() {
-  // destroy span handle on exit
-  [[maybe_unused]] const auto span_ptr = std::move(span_ptr_);
-  switch (ro_future_.wait_until(until_)) {
-    case engine::FutureStatus::kReady:
-      return ro_future_.get();
+engine::impl::ContextAccessor* Request::TryGetContextAccessor() noexcept { return future_.TryGetContextAccessor(); }
 
-    case engine::FutureStatus::kTimeout:
-      return std::make_shared<Reply>(std::string(), nullptr, REDIS_ERR_TIMEOUT);
-
-    case engine::FutureStatus::kCancelled:
-      throw RequestCancelledException(
-          "Redis request wait was aborted due to task cancellation");
-  }
-}
-
-ReplyPtr Request::Get() { return request_future_.Get(); }
-
-RequestFuture&& Request::PopFuture() { return std::move(request_future_); }
-
-}  // namespace redis
+}  // namespace storages::redis::impl
 
 USERVER_NAMESPACE_END

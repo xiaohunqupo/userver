@@ -8,24 +8,30 @@
 namespace tests::handlers {
 namespace {
 
-const utils::statistics::MetricTag<std::atomic<int>> kFooMetric{
-    "sample-metrics.foo"};
+/// [metrics definition]
+const utils::statistics::MetricTag<std::atomic<int>> kFooMetric{"sample-metrics.foo"};
+/// [metrics definition]
 
 }  // namespace
 
-Metrics::Metrics(const userver::components::ComponentConfig& config,
-                 const userver::components::ComponentContext& context)
-    : userver::server::handlers::HttpHandlerJsonBase(config, context),
-      metrics_(context.FindComponent<components::StatisticsStorage>()
-                   .GetMetricsStorage()) {}
+Metrics::Metrics(const components::ComponentConfig& config, const components::ComponentContext& context)
+    : server::handlers::HttpHandlerJsonBase(config, context),
+      metrics_(context.FindComponent<components::StatisticsStorage>().GetMetricsStorage()) {}
 
 formats::json::Value Metrics::HandleRequestJsonThrow(
     [[maybe_unused]] const server::http::HttpRequest& request,
     [[maybe_unused]] const formats::json::Value& request_body,
-    [[maybe_unused]] server::request::RequestContext& context) const {
-  formats::json::ValueBuilder result;
-  metrics_->GetMetric(kFooMetric)++;
-  return result.ExtractValue();
+    [[maybe_unused]] server::request::RequestContext& context
+) const {
+    request.GetHttpResponse().SetContentType(http::content_type::kApplicationJson);
+    formats::json::ValueBuilder result;
+
+    /// [metrics usage]
+    std::atomic<int>& foo_metric = metrics_->GetMetric(kFooMetric);
+    ++foo_metric;  // safe to increment conceurrently
+    /// [metrics usage]
+
+    return result.ExtractValue();
 }
 
 }  // namespace tests::handlers

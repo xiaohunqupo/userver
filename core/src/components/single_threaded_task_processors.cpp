@@ -9,12 +9,13 @@ USERVER_NAMESPACE_BEGIN
 namespace components {
 
 SingleThreadedTaskProcessors::SingleThreadedTaskProcessors(
-    const ComponentConfig& config, const ComponentContext& context)
-    : LoggableComponentBase(config, context),
-      pool_(config.As<engine::TaskProcessorConfig>()) {}
+    const ComponentConfig& config,
+    const ComponentContext& context
+)
+    : ComponentBase(config, context), pool_(config.As<engine::TaskProcessorConfig>()) {}
 
 yaml_config::Schema SingleThreadedTaskProcessors::GetStaticConfigSchema() {
-  return yaml_config::MergeSchemas<LoggableComponentBase>(R"(
+    return yaml_config::MergeSchemas<ComponentBase>(R"(
 type: object
 description: single-threaded-task-processors config
 additionalProperties: false
@@ -34,9 +35,9 @@ properties:
         type: string
         description: |
             OS scheduling mode for the task processor threads.
-            `idle` sets the lowest pririty.
+            `idle` sets the lowest priority.
             `low-priority` sets the priority below `normal` but
-            higher than `idle`.   
+            higher than `idle`.
         defaultDescription: normal
         enum:
           - normal

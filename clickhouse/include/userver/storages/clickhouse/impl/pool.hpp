@@ -6,7 +6,7 @@
 #include <userver/storages/clickhouse/options.hpp>
 
 #include <userver/clients/dns/resolver_fwd.hpp>
-#include <userver/formats/json/value.hpp>
+#include <userver/utils/statistics/writer.hpp>
 
 USERVER_NAMESPACE_BEGIN
 
@@ -20,23 +20,23 @@ struct PoolSettings;
 class InsertionRequest;
 
 class Pool final {
- public:
-  Pool(clients::dns::Resolver&, PoolSettings&&);
-  ~Pool();
+public:
+    Pool(clients::dns::Resolver&, PoolSettings&&);
+    ~Pool();
 
-  Pool(const Pool&) = delete;
-  Pool(Pool&&) = default;
+    Pool(const Pool&) = delete;
+    Pool(Pool&&) = default;
 
-  ExecutionResult Execute(OptionalCommandControl, const Query& query) const;
+    ExecutionResult Execute(OptionalCommandControl, const Query& query) const;
 
-  void Insert(OptionalCommandControl, const InsertionRequest& request) const;
+    void Insert(OptionalCommandControl, const InsertionRequest& request) const;
 
-  formats::json::Value GetStatistics() const;
+    void WriteStatistics(USERVER_NAMESPACE::utils::statistics::Writer& writer) const;
 
-  bool IsAvailable() const;
+    bool IsAvailable() const;
 
- private:
-  std::shared_ptr<PoolImpl> impl_;
+private:
+    std::shared_ptr<PoolImpl> impl_;
 };
 }  // namespace impl
 

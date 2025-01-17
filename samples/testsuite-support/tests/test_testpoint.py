@@ -1,5 +1,4 @@
 import pytest
-
 import pytest_userver.plugins.testpoint
 
 
@@ -11,6 +10,7 @@ async def test_basic(service_client, testpoint):
 
     response = await service_client.get('/testpoint')
     assert response.status == 200
+    assert 'application/json' in response.headers['Content-Type']
     assert simple_testpoint.times_called == 1
     # /// [Testpoint - fixture]
 
@@ -23,6 +23,7 @@ async def test_injection(service_client, testpoint):
 
     response = await service_client.get('/testpoint')
     assert response.status == 200
+    assert 'application/json' in response.headers['Content-Type']
     assert response.json() == {'value': 'injected'}
 
     # testpoint supports callqueue interface
@@ -38,12 +39,12 @@ async def test_disabled_testpoint(service_client, testpoint):
     def injection_point(data):
         return {'value': 'injected'}
 
-    # /// [Unregistred testpoint usage]
+    # /// [Unregistered testpoint usage]
     with pytest.raises(
-            pytest_userver.plugins.testpoint.UnregisteredTestpointError,
+        pytest_userver.plugins.testpoint.UnregisteredTestpointError,
     ):
         assert injection_point.times_called == 0
-    # /// [Unregistred testpoint usage]
+    # /// [Unregistered testpoint usage]
 
     await service_client.update_server_state()
     assert injection_point.times_called == 0

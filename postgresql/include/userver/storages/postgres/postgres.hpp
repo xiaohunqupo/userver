@@ -12,6 +12,8 @@
 
 /// @page pg_driver uPg Driver
 ///
+/// **Quality:** @ref QUALITY_TIERS "Platinum Tier".
+///
 /// 🐙 **userver** provides access to PostgreSQL database servers via
 /// components::Postgres. The uPg driver is asynchronous, it suspends
 /// current coroutine for carrying out network I/O.
@@ -26,14 +28,26 @@
 ///   separately from the query;
 /// - Automatic PgaaS topology discovery;
 /// - Selecting query target (master/slave);
-/// - Connection failover
+/// - Connection failover;
 /// - Transaction support;
 /// - Variadic template query parameter passing;
 /// - Query result extraction to C++ types;
-/// - Binary protocol usage for communication;
+/// - More effective binary protocol usage for communication rather than the
+///   libpq's text protocol;
+/// - Caching the low-level database (D)escribe responses to save about a half
+///   of network bandwidth on select statements that return multiple columns
+///   (compared to the libpq implementation);
 /// - Portals for effective background cache updates;
-/// - Queries pipelining;
-/// - Mapping PostgreSQL user types to C++ types.
+/// - Queries pipelining to execute multiple queries in one network roundtrip
+///   (for example `begin + set transaction timeout + insert` result in one
+///   roundtrip);
+/// - Ability to manually control network roundtrips via
+///   storages::postgres::QueryQueue to gain maximum efficiency
+///   in case of multiple unrelated select statements;
+/// - Mapping PostgreSQL user types to C++ types;
+/// - Transaction error injection via pytest_userver.sql.RegisteredTrx;
+/// - LISTEN/NOTIFY support via storages::postgres::Cluster::Listen();
+/// - @ref scripts/docs/en/userver/deadline_propagation.md .
 ///
 /// @section toc More information
 /// - For configuration see components::Postgres
@@ -41,15 +55,15 @@
 /// - @ref pg_transactions
 /// - @ref pg_run_queries
 /// - @ref pg_process_results
-/// - @ref pg_types
-/// - @ref pg_user_types
+/// - @ref scripts/docs/en/userver/pg_types.md
+/// - @ref scripts/docs/en/userver/pg_user_types.md
 /// - @ref pg_errors
 /// - @ref pg_topology
 ///
 /// ----------
 ///
 /// @htmlonly <div class="bottom-nav"> @endhtmlonly
-/// ⇦ @ref md_en_userver_lru_cache | @ref pg_transactions ⇨
+/// ⇦ @ref scripts/docs/en/userver/lru_cache.md | @ref pg_transactions ⇨
 /// @htmlonly </div> @endhtmlonly
 
 USERVER_NAMESPACE_BEGIN

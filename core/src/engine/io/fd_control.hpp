@@ -4,15 +4,14 @@
 #include <atomic>
 #include <cerrno>
 
-#include <userver/engine/deadline.hpp>
 #include <userver/engine/io/exception.hpp>
 #include <userver/engine/io/fd_control_holder.hpp>
+#include <userver/engine/io/fd_poller.hpp>
 #include <userver/engine/mutex.hpp>
 #include <userver/engine/task/cancel.hpp>
 #include <userver/logging/log.hpp>
 #include <userver/utils/assert.hpp>
 
-#include <engine/ev/watcher.hpp>
 #include <engine/task/task_context.hpp>
 #include <userver/engine/impl/wait_list_fwd.hpp>
 
@@ -21,230 +20,257 @@ USERVER_NAMESPACE_BEGIN
 namespace engine::io::impl {
 
 /// I/O operation transfer mode
+///
+/// A note about `TransferMode::kPartial`:
+/// OS developers are very smart people and they understand that syscalls
+/// are expensive, so they will try their best to return/send as much data as
+/// possible in one go.
+/// `TransferMode::kPartial` might lead to very noticeable overhead in syscalls
+/// if used carelessly, so you are encouraged to stop for a second and think
+/// whether you really need this mode.
 enum class TransferMode {
-  kPartial,  ///< operation may complete after transferring any amount of data
-  kWhole,    ///< operation may complete only after the whole buffer is
-             ///< transferred
-  kOnce,     ///< operation will complete after the first successful transfer
+    kPartial,  ///< operation may complete after transferring any amount of data
+    kWhole,    ///< operation may complete only after the whole buffer is
+               ///< transferred
+    kOnce,     ///< operation will complete after the first successful transfer
 };
 
 /// Return HandleError in PerformIo
 enum class ErrorMode {
-  kProcessed,  ///< continue execute operation
-  kFatal,      ///< break execute operation
+    kProcessed,  ///< continue execute operation
+    kFatal,      ///< break execute operation
 };
 
 class FdControl;
 
 class Direction final {
- public:
-  enum class Kind { kRead, kWrite };
+public:
+    using Kind = FdPoller::Kind;
+    using State = FdPoller::State;
 
-  enum class State : int {
-    kInvalid,
-    kReadyToUse,
-    kInUse,  /// < used inly in debug to detect invalid concurrent usage
-  };
-
-  class SingleUserGuard final {
-   public:
+    class SingleUserGuard final {
+    public:
 #ifdef NDEBUG
-    explicit constexpr SingleUserGuard(Direction&) noexcept {}
+        explicit constexpr SingleUserGuard(Direction&) noexcept {}
 #else
-    explicit SingleUserGuard(Direction& dir);
-    ~SingleUserGuard();
+        explicit SingleUserGuard(Direction& dir);
+        ~SingleUserGuard();
 
-   private:
-    Direction& dir_;
+    private:
+        Direction& dir_;
 #endif
-  };
+    };
 
-  Direction(const Direction&) = delete;
-  Direction(Direction&&) = delete;
-  Direction& operator=(const Direction&) = delete;
-  Direction& operator=(Direction&&) = delete;
-  ~Direction();
+    Direction(const Direction&) = delete;
+    Direction(Direction&&) = delete;
+    Direction& operator=(const Direction&) = delete;
+    Direction& operator=(Direction&&) = delete;
+    ~Direction() = default;
 
-  explicit operator bool() const noexcept { return IsValid(); }
-  bool IsValid() const noexcept { return state_ != State::kInvalid; }
+    explicit operator bool() const noexcept { return static_cast<bool>(poller_); }
+    bool IsValid() const noexcept { return poller_.IsValid(); }
 
-  int Fd() const { return fd_; }
+    int Fd() const noexcept { return poller_.GetFd(); }
 
-  [[nodiscard]] bool Wait(Deadline);
+    [[nodiscard]] bool Wait(Deadline deadline) { return poller_.Wait(deadline).has_value(); }
 
-  // (IoFunc*)(int, void*, size_t), e.g. read
-  template <typename IoFunc, typename... Context>
-  size_t PerformIo(SingleUserGuard& guard, IoFunc&& io_func, void* buf,
-                   size_t len, TransferMode mode, Deadline deadline,
-                   const Context&... context);
+    void ResetReady() noexcept { poller_.ResetReady(); }
 
-  template <typename IoFunc, typename... Context>
-  size_t PerformIoV(SingleUserGuard& guard, IoFunc&& io_func,
-                    struct iovec* list, std::size_t list_size,
-                    TransferMode mode, Deadline deadline,
-                    const Context&... context);
+    // (IoFunc*)(int, void*, size_t), e.g. read
+    template <typename IoFunc, typename... Context>
+    size_t PerformIo(
+        SingleUserGuard& guard,
+        IoFunc&& io_func,
+        void* buf,
+        size_t len,
+        TransferMode mode,
+        Deadline deadline,
+        const Context&... context
+    );
 
- private:
-  friend class FdControl;
-  explicit Direction(Kind kind);
+    template <typename IoFunc, typename... Context>
+    size_t PerformIoV(
+        SingleUserGuard& guard,
+        IoFunc&& io_func,
+        struct iovec* list,
+        std::size_t list_size,
+        TransferMode mode,
+        Deadline deadline,
+        const Context&... context
+    );
 
-  engine::impl::TaskContext::WakeupSource DoWait(Deadline);
+    engine::impl::ContextAccessor* TryGetContextAccessor() noexcept { return poller_.TryGetContextAccessor(); }
 
-  void Reset(int fd);
-  void StopWatcher();
-  void WakeupWaiters();
+private:
+    friend class FdControl;
+    explicit Direction(const ev::ThreadControl& control) : poller_(control) {}
 
-  // does not notify
-  void Invalidate();
+    void Reset(int fd, Kind kind) { poller_.Reset(fd, kind); }
 
-  template <typename... Context>
-  ErrorMode TryHandleError(int error_code, size_t processed_bytes,
-                           TransferMode mode, Deadline deadline,
-                           Context&... context);
+    void WakeupWaiters() { poller_.WakeupWaiters(); }
 
-  static void IoWatcherCb(struct ev_loop*, ev_io*, int) noexcept;
+    // does not notify
+    void Invalidate() { poller_.Invalidate(); }
 
-  int fd_{-1};
-  const Kind kind_;
-  std::atomic<State> state_;
-  engine::impl::FastPimplWaitListLight waiters_;
-  ev::Watcher<ev_io> watcher_;
+    template <typename... Context>
+    ErrorMode
+    TryHandleError(int error_code, size_t processed_bytes, TransferMode mode, Deadline deadline, Context&... context);
+
+    FdPoller poller_;
 };
 
 class FdControl final {
- public:
-  // fd will be silently forced to nonblocking mode
-  static FdControlHolder Adopt(int fd);
+public:
+    // fd will be silently forced to nonblocking mode
+    static FdControlHolder Adopt(int fd);
 
-  FdControl();
-  ~FdControl();
+    explicit FdControl(const ev::ThreadControl& control);
+    ~FdControl();
 
-  explicit operator bool() const { return IsValid(); }
-  bool IsValid() const { return read_.IsValid(); }
+    explicit operator bool() const { return IsValid(); }
+    bool IsValid() const { return read_.IsValid(); }
 
-  int Fd() const { return read_.Fd(); }
+    int Fd() const noexcept { return read_.Fd(); }
 
-  Direction& Read() {
-    UASSERT(IsValid());
-    return read_;
-  }
-  Direction& Write() {
-    UASSERT(IsValid());
-    return write_;
-  }
+    Direction& Read() {
+        UASSERT(IsValid());
+        return read_;
+    }
+    Direction& Write() {
+        UASSERT(IsValid());
+        return write_;
+    }
 
-  void Close();
+    void Close();
 
-  // does not close, must have no waiting in progress
-  void Invalidate();
+    // does not close, must have no waiting in progress
+    void Invalidate();
 
- private:
-  Direction read_;
-  Direction write_;
+private:
+    Direction read_;
+    Direction write_;
 };
 
 template <typename... Context>
-ErrorMode Direction::TryHandleError(int error_code, size_t processed_bytes,
-                                    TransferMode mode, Deadline deadline,
-                                    Context&... context) {
-  if (error_code == EINTR) {
-    return ErrorMode::kProcessed;
-  } else if (error_code == EWOULDBLOCK || error_code == EAGAIN) {
-    if (processed_bytes != 0 && mode != TransferMode::kWhole) {
-      return ErrorMode::kFatal;
-    }
-    if (current_task::ShouldCancel()) {
-      throw(IoCancelled(/*bytes_transferred =*/processed_bytes)
-            << ... << context);
-    }
-    if (DoWait(deadline) ==
-        engine::impl::TaskContext::WakeupSource::kDeadlineTimer) {
-      throw(IoTimeout(/*bytes_transferred =*/processed_bytes)
-            << ... << context);
-    }
-    if (!IsValid()) {
-      throw((IoException() << "Fd closed during ") << ... << context);
-    }
-  } else {
-    IoSystemError ex(error_code, "Direction::PerformIo");
-    ex << "Error while ";
-    (ex << ... << context);
-    ex << ", fd=" << fd_;
-    auto log_level = logging::Level::kError;
-    if (error_code == ECONNRESET || error_code == EPIPE) {
-      log_level = logging::Level::kWarning;
-    }
-    LOG(log_level) << ex;
-    if (processed_bytes != 0) {
-      return ErrorMode::kFatal;
-    }
-    throw std::move(ex);
-  }
-  return ErrorMode::kProcessed;
-}
-
-template <typename IoFunc, typename... Context>
-size_t Direction::PerformIoV(SingleUserGuard&, IoFunc&& io_func,
-                             struct iovec* list, std::size_t list_size,
-                             TransferMode mode, Deadline deadline,
-                             const Context&... context) {
-  UASSERT(list_size > 0);
-  UASSERT(list_size <= IOV_MAX);
-  std::size_t processed_bytes = 0;
-  do {
-    auto chunk_size = io_func(fd_, list, list_size);
-
-    if (chunk_size > 0) {
-      processed_bytes += chunk_size;
-      if (mode == TransferMode::kOnce) {
-        break;
-      }
-      std::size_t offset = chunk_size;
-      do {
-        std::size_t len = list->iov_len;
-        if (offset >= len) {
-          ++list;
-          offset -= len;
-          --list_size;
-          UASSERT(list_size != 0 || offset == 0);
-        } else {
-          list->iov_len -= offset;
-          list->iov_base = static_cast<char*>(list->iov_base) + offset;
-          offset = 0;
+ErrorMode Direction::TryHandleError(
+    int error_code,
+    size_t processed_bytes,
+    TransferMode mode,
+    Deadline deadline,
+    Context&... context
+) {
+    if (error_code == EINTR) {
+        return ErrorMode::kProcessed;
+    } else if (
+        error_code == EWOULDBLOCK
+#if EWOULDBLOCK != EAGAIN
+        || error_code == EAGAIN
+#endif
+    ) {
+        if (processed_bytes != 0 && mode != TransferMode::kWhole) {
+            return ErrorMode::kFatal;
         }
-      } while (offset != 0);
-    } else if (!chunk_size ||
-               TryHandleError(errno, processed_bytes, mode, deadline,
-                              context...) == ErrorMode::kFatal) {
-      break;
+        if (current_task::ShouldCancel()) {
+            throw(IoCancelled(/*bytes_transferred =*/processed_bytes) << ... << context);
+        }
+        if (!poller_.Wait(deadline)) {
+            if (current_task::ShouldCancel()) {
+                throw(IoCancelled(/*bytes_transferred =*/processed_bytes) << ... << context);
+            } else {
+                throw(IoTimeout(/*bytes_transferred =*/processed_bytes) << ... << context);
+            }
+        }
+        if (!IsValid()) {
+            throw((IoException() << "Fd closed during ") << ... << context);
+        }
+    } else {
+        IoSystemError ex(error_code, "Direction::PerformIo");
+        ex << "Error while ";
+        (ex << ... << context);
+        ex << ", fd=" << Fd();
+        auto log_level = logging::Level::kError;
+        if (error_code == ECONNRESET || error_code == EPIPE) {
+            log_level = logging::Level::kInfo;
+        }
+        LOG(log_level) << ex;
+        if (processed_bytes != 0) {
+            return ErrorMode::kFatal;
+        }
+        throw std::move(ex);
     }
-  } while (list_size != 0);
-  return processed_bytes;
+    return ErrorMode::kProcessed;
 }
 
 template <typename IoFunc, typename... Context>
-size_t Direction::PerformIo(SingleUserGuard&, IoFunc&& io_func, void* buf,
-                            size_t len, TransferMode mode, Deadline deadline,
-                            const Context&... context) {
-  char* const begin = static_cast<char*>(buf);
-  char* const end = begin + len;
+size_t Direction::PerformIoV(
+    SingleUserGuard&,
+    IoFunc&& io_func,
+    struct iovec* list,
+    std::size_t list_size,
+    TransferMode mode,
+    Deadline deadline,
+    const Context&... context
+) {
+    UASSERT(list_size > 0);
+    UASSERT(list_size <= IOV_MAX);
+    std::size_t processed_bytes = 0;
+    do {
+        auto chunk_size = io_func(Fd(), list, list_size);
 
-  char* pos = begin;
+        if (chunk_size > 0) {
+            processed_bytes += chunk_size;
+            if (mode == TransferMode::kOnce) {
+                break;
+            }
+            std::size_t offset = chunk_size;
+            while (list_size > 0) {
+                const std::size_t len = list->iov_len;
+                if (offset >= len) {
+                    ++list;
+                    offset -= len;
+                    --list_size;
+                    UASSERT(list_size != 0 || offset == 0);
+                } else {
+                    list->iov_len -= offset;
+                    list->iov_base = static_cast<char*>(list->iov_base) + offset;
+                    break;
+                }
+            }
+        } else if (!chunk_size || TryHandleError(errno, processed_bytes, mode, deadline, context...) == ErrorMode::kFatal) {
+            break;
+        }
+    } while (list_size != 0);
+    return processed_bytes;
+}
 
-  while (pos < end) {
-    auto chunk_size = io_func(fd_, pos, end - pos);
+template <typename IoFunc, typename... Context>
+size_t Direction::PerformIo(
+    SingleUserGuard&,
+    IoFunc&& io_func,
+    void* buf,
+    size_t len,
+    TransferMode mode,
+    Deadline deadline,
+    const Context&... context
+) {
+    char* const begin = static_cast<char*>(buf);
+    char* const end = begin + len;
 
-    if (chunk_size > 0) {
-      pos += chunk_size;
-      if (mode == TransferMode::kOnce) {
-        break;
-      }
-    } else if (!chunk_size || TryHandleError(errno, pos - begin, mode, deadline,
-                                             context...) == ErrorMode::kFatal) {
-      break;
+    char* pos = begin;
+
+    while (pos < end) {
+        auto chunk_size = io_func(Fd(), pos, end - pos);
+
+        if (chunk_size > 0) {
+            pos += chunk_size;
+            if (mode == TransferMode::kOnce) {
+                break;
+            }
+        } else if (!chunk_size || TryHandleError(errno, pos - begin, mode, deadline, context...) == ErrorMode::kFatal) {
+            break;
+        }
     }
-  }
-  return pos - begin;
+    return pos - begin;
 }
 
 }  // namespace engine::io::impl

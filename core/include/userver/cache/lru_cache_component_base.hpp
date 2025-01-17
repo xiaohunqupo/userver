@@ -3,13 +3,19 @@
 /// @file userver/cache/lru_cache_component_base.hpp
 /// @brief @copybrief cache::LruCacheComponent
 
+#include <functional>
+
 #include <userver/cache/expirable_lru_cache.hpp>
 #include <userver/cache/lru_cache_config.hpp>
-#include <userver/components/loggable_component_base.hpp>
+#include <userver/components/component_base.hpp>
 #include <userver/concurrent/async_event_source.hpp>
+#include <userver/dump/dumper.hpp>
+#include <userver/dump/meta.hpp>
+#include <userver/dump/operations.hpp>
 #include <userver/dynamic_config/source.hpp>
-#include <userver/testsuite/component_control.hpp>
-#include <userver/utils/statistics/storage.hpp>
+#include <userver/logging/log.hpp>
+#include <userver/testsuite/cache_control.hpp>
+#include <userver/utils/statistics/entry.hpp>
 #include <userver/yaml_config/schema.hpp>
 
 USERVER_NAMESPACE_BEGIN
@@ -18,24 +24,15 @@ namespace cache {
 
 namespace impl {
 
-formats::json::Value GetCacheStatisticsAsJson(
-    const ExpirableLruCacheStatistics& stats, std::size_t size);
+utils::statistics::Entry RegisterOnStatisticsStorage(
+    const components::ComponentContext& context,
+    const std::string& name,
+    std::function<void(utils::statistics::Writer&)> func
+);
 
-template <typename Key, typename Value, typename Hash, typename Equal>
-formats::json::Value GetCacheStatisticsAsJson(
-    const ExpirableLruCache<Key, Value, Hash, Equal>& cache) {
-  return GetCacheStatisticsAsJson(cache.GetStatistics(),
-                                  cache.GetSizeApproximate());
-}
+dynamic_config::Source FindDynamicConfigSource(const components::ComponentContext& context);
 
-testsuite::ComponentControl& FindComponentControl(
-    const components::ComponentContext& context);
-
-utils::statistics::Storage& FindStatisticsStorage(
-    const components::ComponentContext& context);
-
-dynamic_config::Source FindDynamicConfigSource(
-    const components::ComponentContext& context);
+bool IsDumpSupportEnabled(const components::ComponentConfig& config);
 
 yaml_config::Schema GetLruCacheComponentBaseSchema();
 
@@ -53,7 +50,7 @@ yaml_config::Schema GetLruCacheComponentBaseSchema();
 /// Caching components must be configured in service config (see options below)
 /// and may be reconfigured dynamically via components::DynamicConfig.
 ///
-/// ## Dynamic config
+/// ## LruCacheComponent Dynamic config
 /// * @ref USERVER_LRU_CACHES
 ///
 /// ## Static options:
@@ -62,6 +59,7 @@ yaml_config::Schema GetLruCacheComponentBaseSchema();
 /// size | max amount of items to store in cache | --
 /// ways | number of ways for associative cache | --
 /// lifetime | TTL for cache entries (0 is unlimited) | 0
+/// background-update | enables asynchronous updates for expiring values | false
 /// config-settings | enables dynamic reconfiguration with CacheConfigSet | true
 ///
 /// ## Example usage:
@@ -75,129 +73,156 @@ yaml_config::Schema GetLruCacheComponentBaseSchema();
 /// @snippet cache/lru_cache_component_base_test.cpp  Sample lru cache component config
 
 // clang-format on
-template <typename Key, typename Value, typename Hash = std::hash<Key>,
-          typename Equal = std::equal_to<Key>>
-class LruCacheComponent : public components::LoggableComponentBase {
- public:
-  using Cache = ExpirableLruCache<Key, Value, Hash, Equal>;
-  using CacheWrapper = LruCacheWrapper<Key, Value, Hash, Equal>;
+template <typename Key, typename Value, typename Hash = std::hash<Key>, typename Equal = std::equal_to<Key>>
+// NOLINTNEXTLINE(fuchsia-multiple-inheritance)
+class LruCacheComponent : public components::ComponentBase, private dump::DumpableEntity {
+public:
+    using Cache = ExpirableLruCache<Key, Value, Hash, Equal>;
+    using CacheWrapper = LruCacheWrapper<Key, Value, Hash, Equal>;
 
-  LruCacheComponent(const components::ComponentConfig&,
-                    const components::ComponentContext&);
+    LruCacheComponent(const components::ComponentConfig&, const components::ComponentContext&);
 
-  ~LruCacheComponent() override;
+    ~LruCacheComponent() override;
 
-  CacheWrapper GetCache();
+    CacheWrapper GetCache();
 
-  static yaml_config::Schema GetStaticConfigSchema();
+    static yaml_config::Schema GetStaticConfigSchema();
 
- protected:
-  virtual Value DoGetByKey(const Key& key) = 0;
+protected:
+    virtual Value DoGetByKey(const Key& key) = 0;
 
- private:
-  void DropCache();
+    std::shared_ptr<Cache> GetCacheRaw() { return cache_; }
 
-  Value GetByKey(const Key& key);
+private:
+    void DropCache();
 
-  void OnConfigUpdate(const dynamic_config::Snapshot& cfg);
+    Value GetByKey(const Key& key);
 
-  void UpdateConfig(const LruCacheConfig& config);
+    void OnConfigUpdate(const dynamic_config::Snapshot& cfg);
 
- protected:
-  std::shared_ptr<Cache> GetCacheRaw() { return cache_; }
+    void UpdateConfig(const LruCacheConfig& config);
 
- private:
-  const std::string name_;
-  const LruCacheConfigStatic static_config_;
-  const std::shared_ptr<Cache> cache_;
-  concurrent::AsyncEventSubscriberScope config_subscription_;
-  utils::statistics::Entry statistics_holder_;
-  std::optional<testsuite::ComponentInvalidatorHolder> invalidator_holder_;
+    static constexpr bool kCacheIsDumpable = dump::kIsDumpable<Key> && dump::kIsDumpable<Value>;
+
+    void GetAndWrite(dump::Writer& writer) const override;
+    void ReadAndSet(dump::Reader& reader) override;
+
+    const std::string name_;
+    const LruCacheConfigStatic static_config_;
+    std::shared_ptr<dump::Dumper> dumper_;
+    const std::shared_ptr<Cache> cache_;
+
+    // Subscriptions must be the last fields.
+    concurrent::AsyncEventSubscriberScope config_subscription_;
+    utils::statistics::Entry statistics_holder_;
+    testsuite::CacheResetRegistration reset_registration_;
+    // See the comment above before adding a new field.
 };
 
 template <typename Key, typename Value, typename Hash, typename Equal>
 LruCacheComponent<Key, Value, Hash, Equal>::LruCacheComponent(
     const components::ComponentConfig& config,
-    const components::ComponentContext& context)
-    : LoggableComponentBase(config, context),
+    const components::ComponentContext& context
+)
+    : ComponentBase(config, context),
       name_(components::GetCurrentComponentName(config)),
       static_config_(config),
-      cache_(std::make_shared<Cache>(static_config_.ways,
-                                     static_config_.GetWaySize())) {
-  cache_->SetMaxLifetime(static_config_.config.lifetime);
-  cache_->SetBackgroundUpdate(static_config_.config.background_update);
+      cache_(std::make_shared<Cache>(static_config_.ways, static_config_.GetWaySize())) {
+    if (impl::IsDumpSupportEnabled(config)) {
+        dumper_ = std::make_shared<dump::Dumper>(config, context, static_cast<dump::DumpableEntity&>(*this));
+        cache_->SetDumper(dumper_);
+        dumper_->ReadDump();
+    }
 
-  if (static_config_.use_dynamic_config) {
-    LOG_INFO() << "Dynamic LRU cache config is enabled, subscribing on "
-                  "dynamic-config updates, cache="
-               << name_;
+    cache_->SetMaxLifetime(static_config_.config.lifetime);
+    cache_->SetBackgroundUpdate(static_config_.config.background_update);
 
-    config_subscription_ =
-        impl::FindDynamicConfigSource(context).UpdateAndListen(
-            this, "cache." + name_,
-            &LruCacheComponent<Key, Value, Hash, Equal>::OnConfigUpdate);
-  } else {
-    LOG_INFO() << "Dynamic LRU cache config is disabled, cache=" << name_;
-  }
+    if (static_config_.use_dynamic_config) {
+        LOG_INFO() << "Dynamic LRU cache config is enabled, subscribing on "
+                      "dynamic-config updates, cache="
+                   << name_;
 
-  statistics_holder_ = impl::FindStatisticsStorage(context).RegisterExtender(
-      "cache." + name_, [this](const auto& /*request*/) {
-        return impl::GetCacheStatisticsAsJson(*cache_);
-      });
+        config_subscription_ = impl::FindDynamicConfigSource(context).UpdateAndListen(
+            this, "cache." + name_, &LruCacheComponent::OnConfigUpdate
+        );
+    } else {
+        LOG_INFO() << "Dynamic LRU cache config is disabled, cache=" << name_;
+    }
 
-  invalidator_holder_.emplace(
-      impl::FindComponentControl(context), *this,
-      &LruCacheComponent<Key, Value, Hash, Equal>::DropCache);
+    statistics_holder_ = impl::RegisterOnStatisticsStorage(context, name_, [this](utils::statistics::Writer& writer) {
+        writer = *cache_;
+    });
+
+    reset_registration_ = testsuite::RegisterCache(config, context, this, &LruCacheComponent::DropCache);
 }
 
 template <typename Key, typename Value, typename Hash, typename Equal>
 LruCacheComponent<Key, Value, Hash, Equal>::~LruCacheComponent() {
-  invalidator_holder_.reset();
-  statistics_holder_.Unregister();
-  config_subscription_.Unsubscribe();
+    reset_registration_.Unregister();
+    statistics_holder_.Unregister();
+    config_subscription_.Unsubscribe();
+
+    if (dumper_) {
+        dumper_->CancelWriteTaskAndWait();
+    }
 }
 
 template <typename Key, typename Value, typename Hash, typename Equal>
-typename LruCacheComponent<Key, Value, Hash, Equal>::CacheWrapper
-LruCacheComponent<Key, Value, Hash, Equal>::GetCache() {
-  return CacheWrapper(cache_, [this](const Key& key) { return GetByKey(key); });
+typename LruCacheComponent<Key, Value, Hash, Equal>::CacheWrapper LruCacheComponent<Key, Value, Hash, Equal>::GetCache(
+) {
+    return CacheWrapper(cache_, [this](const Key& key) { return GetByKey(key); });
 }
 
 template <typename Key, typename Value, typename Hash, typename Equal>
 void LruCacheComponent<Key, Value, Hash, Equal>::DropCache() {
-  cache_->Invalidate();
+    cache_->Invalidate();
 }
 
 template <typename Key, typename Value, typename Hash, typename Equal>
 Value LruCacheComponent<Key, Value, Hash, Equal>::GetByKey(const Key& key) {
-  return DoGetByKey(key);
+    return DoGetByKey(key);
 }
 
 template <typename Key, typename Value, typename Hash, typename Equal>
-void LruCacheComponent<Key, Value, Hash, Equal>::OnConfigUpdate(
-    const dynamic_config::Snapshot& cfg) {
-  const auto config = GetLruConfig(cfg, name_);
-  if (config) {
-    LOG_DEBUG() << "Using dynamic config for LRU cache";
-    UpdateConfig(*config);
-  } else {
-    LOG_DEBUG() << "Using static config for LRU cache";
-    UpdateConfig(static_config_.config);
-  }
+void LruCacheComponent<Key, Value, Hash, Equal>::OnConfigUpdate(const dynamic_config::Snapshot& cfg) {
+    const auto config = GetLruConfig(cfg, name_);
+    if (config) {
+        LOG_DEBUG() << "Using dynamic config for LRU cache";
+        UpdateConfig(*config);
+    } else {
+        LOG_DEBUG() << "Using static config for LRU cache";
+        UpdateConfig(static_config_.config);
+    }
 }
 
 template <typename Key, typename Value, typename Hash, typename Equal>
-void LruCacheComponent<Key, Value, Hash, Equal>::UpdateConfig(
-    const LruCacheConfig& config) {
-  cache_->SetWaySize(config.GetWaySize(static_config_.ways));
-  cache_->SetMaxLifetime(config.lifetime);
-  cache_->SetBackgroundUpdate(config.background_update);
+void LruCacheComponent<Key, Value, Hash, Equal>::UpdateConfig(const LruCacheConfig& config) {
+    cache_->SetWaySize(config.GetWaySize(static_config_.ways));
+    cache_->SetMaxLifetime(config.lifetime);
+    cache_->SetBackgroundUpdate(config.background_update);
 }
 
 template <typename Key, typename Value, typename Hash, typename Equal>
-yaml_config::Schema
-LruCacheComponent<Key, Value, Hash, Equal>::GetStaticConfigSchema() {
-  return impl::GetLruCacheComponentBaseSchema();
+yaml_config::Schema LruCacheComponent<Key, Value, Hash, Equal>::GetStaticConfigSchema() {
+    return impl::GetLruCacheComponentBaseSchema();
+}
+
+template <typename Key, typename Value, typename Hash, typename Equal>
+void LruCacheComponent<Key, Value, Hash, Equal>::GetAndWrite(dump::Writer& writer) const {
+    if constexpr (kCacheIsDumpable) {
+        cache_->Write(writer);
+    } else {
+        dump::ThrowDumpUnimplemented(name_);
+    }
+}
+
+template <typename Key, typename Value, typename Hash, typename Equal>
+void LruCacheComponent<Key, Value, Hash, Equal>::ReadAndSet(dump::Reader& reader) {
+    if constexpr (kCacheIsDumpable) {
+        cache_->Read(reader);
+    } else {
+        dump::ThrowDumpUnimplemented(name_);
+    }
 }
 
 }  // namespace cache

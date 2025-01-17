@@ -5,6 +5,7 @@
 #include <userver/components/component_context.hpp>
 #include <userver/components/statistics_storage.hpp>
 #include <userver/storages/secdist/component.hpp>
+#include <userver/utils/statistics/writer.hpp>
 #include <userver/yaml_config/merge_schemas.hpp>
 
 #include <userver/storages/clickhouse/cluster.hpp>
@@ -15,34 +16,32 @@ USERVER_NAMESPACE_BEGIN
 
 namespace components {
 
-ClickHouse::ClickHouse(const ComponentConfig& config,
-                       const ComponentContext& context)
-    : LoggableComponentBase{config, context},
-      dns_{context.FindComponent<clients::dns::Component>()} {
-  const auto& secdist = context.FindComponent<Secdist>().Get();
-  const auto& settings_multi =
-      secdist.Get<storages::clickhouse::impl::ClickhouseSettingsMulti>();
-  const auto& settings =
-      settings_multi.Get(storages::clickhouse::impl::GetSecdistAlias(config));
+ClickHouse::ClickHouse(const ComponentConfig& config, const ComponentContext& context)
+    : ComponentBase{config, context}, dns_{context.FindComponent<clients::dns::Component>()} {
+    const auto& secdist = context.FindComponent<Secdist>().Get();
+    const auto& settings_multi = secdist.Get<storages::clickhouse::impl::ClickhouseSettingsMulti>();
+    const auto& settings = settings_multi.Get(storages::clickhouse::impl::GetSecdistAlias(config));
 
-  cluster_ = std::make_shared<storages::clickhouse::Cluster>(dns_.GetResolver(),
-                                                             settings, config);
+    cluster_ = std::make_shared<storages::clickhouse::Cluster>(dns_.GetResolver(), settings, config);
 
-  auto& statistics_storage =
-      context.FindComponent<components::StatisticsStorage>();
-  statistics_holder_ = statistics_storage.GetStorage().RegisterExtender(
-      "clickhouse." + settings.auth_settings.database,
-      [this](const auto&) { return cluster_->GetStatistics(); });
+    auto& statistics_storage = context.FindComponent<components::StatisticsStorage>();
+    statistics_holder_ = statistics_storage.GetStorage().RegisterWriter(
+        "clickhouse",
+        [this](utils::statistics::Writer& writer) {
+            if (cluster_) {
+                cluster_->WriteStatistics(writer);
+            }
+        },
+        {{"clickhouse_database", settings.auth_settings.database}}
+    );
 }
 
 ClickHouse::~ClickHouse() { statistics_holder_.Unregister(); }
 
-storages::clickhouse::ClusterPtr ClickHouse::GetCluster() const {
-  return cluster_;
-}
+storages::clickhouse::ClusterPtr ClickHouse::GetCluster() const { return cluster_; }
 
 yaml_config::Schema ClickHouse::GetStaticConfigSchema() {
-  return yaml_config::MergeSchemas<LoggableComponentBase>(R"(
+    return yaml_config::MergeSchemas<ComponentBase>(R"(
 type: object
 description: ClickHouse client component
 additionalProperties: false

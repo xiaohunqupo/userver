@@ -3,13 +3,6 @@ project(userver-core CXX)
 include(GetUserverVersion)
 message(STATUS "Userver version ${USERVER_VERSION}")
 
-set(USERVER_NAMESPACE "userver" CACHE STRING "C++ namespace to use")
-if (NOT "${USERVER_NAMESPACE}" STREQUAL "")
-    set(USERVER_NAMESPACE_BEGIN "namespace ${USERVER_NAMESPACE} {" CACHE STRING "Open C++ namespace to use")
-    set(USERVER_NAMESPACE_END "}" CACHE STRING "Close C++ namespace to use")
-endif()
-
-include(RequireDWCAS)
 include(CheckFunctionExists)
 check_function_exists("accept4" HAVE_ACCEPT4)
 check_function_exists("pipe2" HAVE_PIPE2)
@@ -23,31 +16,24 @@ if(${CMAKE_SOURCE_DIR}/.git/HEAD IS_NEWER_THAN ${BUILD_CONFIG})
 endif()
 
 file(GLOB_RECURSE SOURCES
-  ${CMAKE_CURRENT_SOURCE_DIR}/../shared/*.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/../shared/*.hpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/*.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/internal/*.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/internal/*.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/*.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp
 )
 
 file(GLOB_RECURSE UNIT_TEST_SOURCES
-  ${CMAKE_CURRENT_SOURCE_DIR}/../shared/*_test.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/*_test.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/*_test.cpp
 )
 
-file(GLOB_RECURSE LIBUTEST_SOURCES
-  ${CMAKE_CURRENT_SOURCE_DIR}/testing/*.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/testing/*.hpp
-)
-list(REMOVE_ITEM LIBUTEST_SOURCES ${UNIT_TEST_SOURCES})
-
-list(REMOVE_ITEM SOURCES ${UNIT_TEST_SOURCES} ${LIBUTEST_SOURCES})
+list(REMOVE_ITEM SOURCES ${UNIT_TEST_SOURCES})
 
 file(GLOB_RECURSE BENCH_SOURCES
-  ${CMAKE_CURRENT_SOURCE_DIR}/../shared/*_benchmark.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/*_benchmark.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/*_benchmark.cpp
 )
 file(GLOB_RECURSE LIBUBENCH_SOURCES
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/core_benchmark.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/benchmarks/main.cpp
 )
 list (REMOVE_ITEM SOURCES ${BENCH_SOURCES} ${LIBUBENCH_SOURCES})
 
@@ -58,109 +44,173 @@ file(GLOB_RECURSE INTERNAL_SOURCES
 
 list (REMOVE_ITEM SOURCES ${INTERNAL_SOURCES})
 
-set(CMAKE_THREAD_PREFER_PTHREAD ON)
-set(THREADS_PREFER_PTHREAD_FLAG ON)
-find_package(Threads REQUIRED)
-find_package(Boost REQUIRED COMPONENTS
+find_package(Boost REQUIRED CONFIG COMPONENTS
     program_options
     filesystem
     locale
     regex
     iostreams
 )
-find_package_required(LibEv "libev-dev")
 find_package_required(ZLIB "zlib1g-dev")
 
-if (USERVER_FEATURE_UTEST)
-    include(SetupGTest)
-    include(SetupGBench)
-endif()
-include(SetupSpdlog)
-
-option(USERVER_FEATURE_SPDLOG_TCP_SINK "Use tcp_sink.h of the spdlog library for testing logs" ON)
-if (NOT USERVER_FEATURE_SPDLOG_TCP_SINK)
-  set_source_files_properties(
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/logging/component.cpp
-    PROPERTIES COMPILE_FLAGS -DUSERVER_FEATURE_NO_SPDLOG_TCP_SINK=1
-  )
-endif()
-
-include(SetupCAres)
-include(SetupCURL)
-include(SetupCryptoPP)
-
 find_package(Iconv REQUIRED)
-find_package_required(libyamlcpp "libyaml-cpp-dev")
 find_package_required(OpenSSL "libssl-dev")
-include(SetupFmt)
-include(SetupCCTZ)
 
-find_package_required(Http_Parser "libhttp-parser-dev")
+if (USERVER_CONAN)
+    find_package(c-ares REQUIRED CONFIG)
+    find_package(CURL REQUIRED CONFIG)
+    find_package(cryptopp REQUIRED CONFIG)
+    find_package(libnghttp2 REQUIRED CONFIG)
+    find_package(libev REQUIRED CONFIG)
+
+    find_package(concurrentqueue REQUIRED CONFIG)
+else()
+    include(SetupCAres)
+    include(SetupCURL)
+    include(SetupCryptoPP)
+    find_package(Nghttp2 REQUIRED)
+    find_package(LibEv REQUIRED)
+endif()
 
 add_library(${PROJECT_NAME} STATIC ${SOURCES})
-target_compile_definitions(${PROJECT_NAME} PRIVATE SPDLOG_PREVENT_CHILD_FD SPDLOG_FMT_EXTERNAL)
 
-# https://github.com/jemalloc/jemalloc/issues/820
-if (USERVER_FEATURE_JEMALLOC AND NOT USERVER_SANITIZE AND NOT MACOS)
-  if (USERVER_OPEN_SOURCE_BUILD)
-      find_package_required(Jemalloc "libjemalloc-dev")
-  else()
-      find_package_required(Jemalloc "libyandex-taxi-jemalloc-dev")
-  endif()
-  target_link_libraries(${PROJECT_NAME} PUBLIC Jemalloc)
-  target_compile_definitions(${PROJECT_NAME} PRIVATE JEMALLOC_ENABLED)
+# thread_local usage in Moodycamel is incompatible with userver scheduler
+# that migrates coroutines between threads.
+target_compile_definitions(${PROJECT_NAME} PUBLIC MOODYCAMEL_NO_THREAD_LOCAL)
+
+if (USERVER_DISABLE_PHDR_CACHE)
+  target_compile_definitions(${PROJECT_NAME} PRIVATE USERVER_DISABLE_PHDR_CACHE)
 endif()
 
-# https://bugs.llvm.org/show_bug.cgi?id=16404
-if (USERVER_SANITIZE AND NOT CMAKE_BUILD_TYPE MATCHES "^Rel")
-  target_link_libraries(${PROJECT_NAME} PUBLIC userver-compiler-rt-parts)
+if (USERVER_DISABLE_RSEQ_ACCELERATION)
+  target_compile_definitions(${PROJECT_NAME} PRIVATE USERVER_DISABLE_RSEQ_ACCELERATION)
+else()
+  add_subdirectory(${USERVER_THIRD_PARTY_DIRS}/librseq librseq)
+  target_link_libraries(${PROJECT_NAME} PRIVATE userver-librseq)
+endif()
+
+# https://github.com/jemalloc/jemalloc/issues/820
+if (USERVER_FEATURE_JEMALLOC AND NOT USERVER_SANITIZE AND NOT CMAKE_SYSTEM_NAME MATCHES "Darwin")
+  set_property(
+    SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/src/utils/jemalloc.cpp
+    APPEND PROPERTY COMPILE_FLAGS -DUSERVER_FEATURE_JEMALLOC_ENABLED=1
+  )
 endif()
 
 target_link_libraries(${PROJECT_NAME}
   PUBLIC
-    Threads::Threads
+    userver-universal
     Boost::locale
-    sanitize-target
-    libyamlcpp
-    fmt
-    c-ares
-    cctz
     CURL::libcurl
-    userver-stacktrace
   PRIVATE
-    userver-uboost-coro
     Boost::filesystem
     Boost::program_options
     Boost::iostreams
     Boost::regex
-    CryptoPP
-    Http_Parser
     Iconv::Iconv
-    LibEv
     OpenSSL::Crypto
     OpenSSL::SSL
     ZLIB::ZLIB
-    spdlog_header_only
 )
 
-if (NOT MACOS)
+add_subdirectory(${USERVER_THIRD_PARTY_DIRS}/llhttp llhttp)
+
+add_subdirectory(${USERVER_THIRD_PARTY_DIRS}/http-parser http-parser)
+
+target_link_libraries(${PROJECT_NAME} PRIVATE userver-http-parser userver-llhttp)
+
+set(USERVER_UBOOST_CORO_DEFAULT ON)
+if(CMAKE_SYSTEM_NAME MATCHES "Darwin" AND CMAKE_SYSTEM_PROCESSOR MATCHES "arm64")
+  # Use system Boost.Context and Boost.Coroutine2 with latest patches
+  # for arm64, otherwise userver will crash at startup.
+  #
+  # NOTE: this makes it practically impossible to build userver with sanitizers
+  # on macOS, because Boost.Context and Boost.Coroutine2 will cause
+  # an odr violation when linking sanitized usages in userver with stock Debug
+  # static library.
+  set(USERVER_UBOOST_CORO_DEFAULT OFF)
+  if("${Boost_VERSION_STRING}" VERSION_LESS "1.83.0")
+    message(FATAL_ERROR
+        "Please update Boost to at least 1.83.0, it contains important fixes "
+        "for Boost.Context and Boost.Coroutine2")
+  endif()
+endif()
+
+option(USERVER_FEATURE_UBOOST_CORO "Use vendored boost context instead of a system one" "${USERVER_UBOOST_CORO_DEFAULT}")
+
+if (USERVER_FEATURE_UBOOST_CORO)
+    add_subdirectory(${USERVER_THIRD_PARTY_DIRS}/uboost_coro uboost_coro_build)
+    target_link_libraries(${PROJECT_NAME}
+      PRIVATE
+        userver-uboost-coro
+    )
+    target_include_directories(${PROJECT_NAME} PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/uboost_coro/include
+    )
+else()
+    find_package(Boost REQUIRED CONFIG COMPONENTS
+        context
+        coroutine
+    )
+    target_link_libraries(${PROJECT_NAME}
+      PRIVATE
+        Boost::context
+    )
+    target_include_directories(${PROJECT_NAME} PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/sys_coro/include
+    )
+endif()
+
+if (USERVER_CONAN)
+    target_link_libraries(${PROJECT_NAME}
+      PUBLIC
+        c-ares::cares
+        concurrentqueue::concurrentqueue
+      PRIVATE
+        cryptopp::cryptopp
+        libev::libev
+        libnghttp2::nghttp2
+    )
+else()
+    target_link_libraries(${PROJECT_NAME}
+      PUBLIC
+        c-ares::cares
+      PRIVATE
+        CryptoPP
+        Nghttp2
+        LibEv
+    )
+
+    target_include_directories(${PROJECT_NAME} SYSTEM PUBLIC
+         $<BUILD_INTERFACE:${USERVER_THIRD_PARTY_DIRS}/moodycamel/include>
+    )
+    _userver_directory_install(COMPONENT core
+        DIRECTORY ${USERVER_THIRD_PARTY_DIRS}/moodycamel/include/moodycamel
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/userver/third_party
+    )
+endif()
+
+if (NOT CMAKE_SYSTEM_NAME MATCHES "Darwin" AND NOT CMAKE_SYSTEM_NAME MATCHES "BSD")
   target_link_libraries(${PROJECT_NAME} PUBLIC atomic)
 endif()
 
-set(USERVER_PUBLIC_INCLUDE_DIRS
-  ${CMAKE_CURRENT_SOURCE_DIR}/include
-  ${CMAKE_CURRENT_SOURCE_DIR}/../shared/include
-  ${USERVER_THIRD_PARTY_DIRS}/pfr/include
+target_include_directories(${PROJECT_NAME} PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<BUILD_INTERFACE:${USERVER_THIRD_PARTY_DIRS}/pfr/include>
 )
-set(USERVER_GLIBC_INCLUDE_FIXES_DIR
-  ${CMAKE_CURRENT_SOURCE_DIR}/libc_include_fixes
+_userver_directory_install(COMPONENT core
+  DIRECTORY
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/..
+)
+_userver_directory_install(COMPONENT core
+  DIRECTORY
+    ${USERVER_THIRD_PARTY_DIRS}/pfr/include/boost
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/userver/third_party
 )
 
-target_include_directories(${PROJECT_NAME} PUBLIC
-  ${USERVER_PUBLIC_INCLUDE_DIRS}
-)
 target_include_directories(${PROJECT_NAME} SYSTEM BEFORE PUBLIC
-  ${USERVER_GLIBC_INCLUDE_FIXES_DIR}
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/libc_include_fixes>
 )
 
 # The bug is only triggered with optimizations enabled -- TAXICOMMON-1729
@@ -169,84 +219,53 @@ set_property(
   APPEND PROPERTY COMPILE_FLAGS -O2
 )
 
-target_include_directories(${PROJECT_NAME} SYSTEM PRIVATE
-  ${USERVER_THIRD_PARTY_DIRS}/rapidjson/include
-)
-
-target_include_directories(${PROJECT_NAME} SYSTEM PUBLIC
-  ${USERVER_THIRD_PARTY_DIRS}/moodycamel/include
-)
-
 target_include_directories(${PROJECT_NAME}
   PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/../shared/src/
+    ${CMAKE_CURRENT_SOURCE_DIR}/../universal/src/
     ${CMAKE_CURRENT_SOURCE_DIR}/src/
     ${CMAKE_CURRENT_BINARY_DIR}
 )
 
-file(TO_NATIVE_PATH "${CMAKE_SOURCE_DIR}/" SRC_LOG_PATH_BASE)
-file(TO_NATIVE_PATH "${CMAKE_BINARY_DIR}/" BIN_LOG_PATH_BASE)
-target_compile_definitions(${PROJECT_NAME} PUBLIC
-  USERVER_LOG_SOURCE_PATH_BASE=${SRC_LOG_PATH_BASE}
-  USERVER_LOG_BUILD_PATH_BASE=${BIN_LOG_PATH_BASE}
-)
-
-message(STATUS "Putting userver into namespace '${USERVER_NAMESPACE}': ${USERVER_NAMESPACE_BEGIN} ${USERVER_NAMESPACE_END}")
-target_compile_definitions(${PROJECT_NAME} PUBLIC
-  "USERVER_NAMESPACE=${USERVER_NAMESPACE}"
-  "USERVER_NAMESPACE_BEGIN=${USERVER_NAMESPACE_BEGIN}"
-  "USERVER_NAMESPACE_END=${USERVER_NAMESPACE_END}"
-)
-
-add_library(userver-core-internal STATIC ${INTERNAL_SOURCES})
-target_compile_definitions(userver-core-internal PUBLIC $<TARGET_PROPERTY:${PROJECT_NAME},COMPILE_DEFINITIONS>)
-target_include_directories(userver-core-internal PUBLIC
-  $<TARGET_PROPERTY:${PROJECT_NAME},INCLUDE_DIRECTORIES>
-  ${CMAKE_CURRENT_SOURCE_DIR}/internal/include
-)
-target_link_libraries(userver-core-internal
-  PUBLIC
-    ${PROJECT_NAME}
-)
+# Must go below all the target options and definitions.
+_check_compile_flags(${PROJECT_NAME})
 
 if (USERVER_FEATURE_UTEST)
-    add_library(userver-utest STATIC ${LIBUTEST_SOURCES})
-    target_compile_definitions(userver-utest PUBLIC $<TARGET_PROPERTY:${PROJECT_NAME},COMPILE_DEFINITIONS>)
-
-    target_link_libraries(userver-utest
+  add_library(userver-core-internal OBJECT ${INTERNAL_SOURCES})
+  target_compile_definitions(userver-core-internal PUBLIC $<TARGET_PROPERTY:${PROJECT_NAME},COMPILE_DEFINITIONS>)
+  target_include_directories(userver-core-internal PUBLIC
+    $<TARGET_PROPERTY:${PROJECT_NAME},INCLUDE_DIRECTORIES>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/internal/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../universal/internal/include>
+  )
+  target_link_libraries(userver-core-internal
     PUBLIC
-        libgtest
-        libgmock
-	    userver-core-internal
-        ${PROJECT_NAME}
-    PRIVATE
-        Boost::program_options
-    )
-    target_include_directories(userver-utest PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/testing/include
-    )
-    target_include_directories(userver-utest PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/
-        ${CMAKE_CURRENT_SOURCE_DIR}/testing/src/
-    )
-
-    # Target with no need to use userver namespace, but includes require userver/
-    add_library(yandex-userver-utest INTERFACE)
-    target_link_libraries(yandex-userver-utest INTERFACE userver-utest)
+      ${PROJECT_NAME}
+  )
+  _userver_directory_install(COMPONENT core
+    DIRECTORY
+      ${CMAKE_CURRENT_SOURCE_DIR}/internal/include
+      ${CMAKE_CURRENT_SOURCE_DIR}/../universal/internal/include
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/..
+  )
+  _userver_install_targets(COMPONENT core TARGETS userver-core-internal)
 endif()
 
-if (USERVER_IS_THE_ROOT_PROJECT)
-    add_executable(${PROJECT_NAME}_unittest ${UNIT_TEST_SOURCES})
-    target_include_directories (${PROJECT_NAME}_unittest PRIVATE
+if (USERVER_FEATURE_UTEST)
+  add_subdirectory(utest)
+endif()
+
+if (USERVER_BUILD_TESTS)
+    add_executable(${PROJECT_NAME}-unittest ${UNIT_TEST_SOURCES})
+    target_include_directories (${PROJECT_NAME}-unittest PRIVATE
         $<TARGET_PROPERTY:${PROJECT_NAME},INCLUDE_DIRECTORIES>
     )
-    target_link_libraries(${PROJECT_NAME}_unittest
+    target_link_libraries(${PROJECT_NAME}-unittest PRIVATE
       userver-utest
+      userver-core-internal
     )
 
-    # We keep testing deprecated functions, no need to warn about that
-    target_compile_options(${PROJECT_NAME}_unittest PRIVATE "-Wno-deprecated-declarations")
-    add_google_tests(${PROJECT_NAME}_unittest)
+    add_google_tests(${PROJECT_NAME}-unittest)
+    add_subdirectory(functional_tests)
 endif()
 
 if (USERVER_FEATURE_UTEST)
@@ -255,22 +274,55 @@ if (USERVER_FEATURE_UTEST)
     target_compile_definitions(userver-ubench PUBLIC $<TARGET_PROPERTY:${PROJECT_NAME},COMPILE_DEFINITIONS>)
     target_link_libraries(userver-ubench
       PUBLIC
-        libbenchmark
-      userver-core-internal
         ${PROJECT_NAME}
+        userver-universal-internal-ubench
+      PRIVATE
+        userver-core-internal
     )
-
-# Target with no need to use userver namespace, but includes require userver/
-add_library(yandex-userver-ubench INTERFACE)
-target_link_libraries(yandex-userver-ubench INTERFACE userver-ubench)
+    _userver_install_targets(COMPONENT core TARGETS userver-ubench userver-universal-internal-ubench)
 endif()
 
-if (USERVER_IS_THE_ROOT_PROJECT)
-    add_executable(${PROJECT_NAME}_benchmark ${BENCH_SOURCES})
-    target_link_libraries(${PROJECT_NAME}_benchmark PUBLIC userver-ubench)
-    add_google_benchmark_tests(${PROJECT_NAME}_benchmark)
+if (USERVER_BUILD_TESTS)
+    add_executable(${PROJECT_NAME}-benchmark ${BENCH_SOURCES})
+
+    target_link_libraries(${PROJECT_NAME}-benchmark
+      PUBLIC
+        userver-ubench
+      PRIVATE
+        userver-core-internal
+    )
+    add_google_benchmark_tests(${PROJECT_NAME}-benchmark)
 endif()
 
-# Target with no need to use userver namespace, but includes require userver/
-add_library(yandex-${PROJECT_NAME} INTERFACE)
-target_link_libraries(yandex-${PROJECT_NAME} INTERFACE ${PROJECT_NAME})
+_userver_install_targets(COMPONENT core TARGETS ${PROJECT_NAME})
+_userver_directory_install(COMPONENT core FILES
+    "${USERVER_ROOT_DIR}/cmake/UserverTestsuite.cmake"
+    "${USERVER_ROOT_DIR}/cmake/install/userver-core-config.cmake"
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/userver
+)
+_userver_directory_install(COMPONENT core FILES
+    "${USERVER_ROOT_DIR}/cmake/modules/Findc-ares.cmake"
+    "${USERVER_ROOT_DIR}/cmake/modules/FindNghttp2.cmake"
+    "${USERVER_ROOT_DIR}/cmake/modules/FindLibEv.cmake"
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/userver/modules
+)
+
+file(GLOB_RECURSE TESTSUITE_INSTALL_FILES
+    "${USERVER_ROOT_DIR}/testsuite/*.txt"
+    "${USERVER_ROOT_DIR}/testsuite/*.py"
+)
+
+_userver_directory_install(COMPONENT core
+    FILES ${TESTSUITE_INSTALL_FILES}
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/userver/testsuite
+)
+
+_userver_directory_install(COMPONENT core
+    PROGRAMS "${USERVER_ROOT_DIR}/testsuite/env.in"
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/userver/testsuite
+)
+
+_userver_directory_install(COMPONENT core DIRECTORY
+    "${USERVER_ROOT_DIR}/testsuite/pytest_plugins/"
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/userver/testsuite/pytest_plugins/
+)

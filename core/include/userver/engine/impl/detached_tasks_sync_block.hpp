@@ -14,29 +14,31 @@ namespace engine::impl {
 class TaskContext;
 
 class DetachedTasksSyncBlock final {
- public:
-  enum class StopMode { kCancelAndWait, kCancel };
+public:
+    enum class StopMode { kCancelAndWait, kCancel };
 
-  explicit DetachedTasksSyncBlock(StopMode stop_mode);
+    explicit DetachedTasksSyncBlock(StopMode stop_mode);
 
-  DetachedTasksSyncBlock(const DetachedTasksSyncBlock&) = delete;
-  DetachedTasksSyncBlock(DetachedTasksSyncBlock&&) = delete;
-  ~DetachedTasksSyncBlock();
+    DetachedTasksSyncBlock(const DetachedTasksSyncBlock&) = delete;
+    DetachedTasksSyncBlock(DetachedTasksSyncBlock&&) = delete;
+    ~DetachedTasksSyncBlock();
 
-  void Add(TaskContext& context);
-  void Add(Task&& task);
+    void Add(TaskContext& context);
+    void Add(Task&& task);
 
-  void RequestCancellation(TaskCancellationReason reason) noexcept;
+    void RequestCancellation(TaskCancellationReason reason) noexcept;
 
-  std::int64_t ActiveTasksApprox() const noexcept;
+    void WaitAllTasksCompleteDebug() noexcept;
 
-  struct Token;
+    std::int64_t ActiveTasksApprox() const noexcept;
 
-  static void Dispose(Token& token) noexcept;
+    struct Token;
 
- private:
-  struct Impl;
-  utils::FastPimpl<Impl, 48, 8> impl_;
+    static void Dispose(Token& token) noexcept;
+
+private:
+    struct Impl;
+    utils::FastPimpl<Impl, 96, 16> impl_;
 };
 
 }  // namespace engine::impl

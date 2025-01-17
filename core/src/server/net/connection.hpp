@@ -1,94 +1,82 @@
 #pragma once
 
-#include <functional>
 #include <memory>
 #include <string>
 
 #include <server/http/request_handler_base.hpp>
 #include <server/net/connection_config.hpp>
 #include <server/net/stats.hpp>
-#include <server/request/request_parser.hpp>
 
-#include <userver/concurrent/queue.hpp>
+// TODO: use fwd
+#include <server/http/http2_session.hpp>
+#include <server/http/http_request_parser.hpp>
+//
 #include <userver/engine/io/socket.hpp>
-#include <userver/engine/single_consumer_event.hpp>
-#include <userver/engine/task/task.hpp>
-#include <userver/engine/task/task_processor_fwd.hpp>
-#include <userver/engine/task/task_with_result.hpp>
-#include <userver/server/request/request_base.hpp>
+#include <userver/server/http/http_request.hpp>
 #include <userver/server/request/request_config.hpp>
 
 USERVER_NAMESPACE_BEGIN
 
 namespace server::net {
 
-class Connection final : public std::enable_shared_from_this<Connection> {
-  struct EmplaceEnabler {};
+struct Http2SessionConfig;
 
- public:
-  using CloseCb = std::function<void()>;
+class Connection final {
+public:
+    enum class Type { kRequest, kMonitor };
 
-  enum class Type { kRequest, kMonitor };
+    Connection(
+        const ConnectionConfig& config,
+        const request::HttpRequestConfig& handler_defaults_config,
+        std::unique_ptr<engine::io::RwBase> peer_socket,
+        const engine::io::Sockaddr& remote_address,
+        const http::RequestHandlerBase& request_handler,
+        std::shared_ptr<Stats> stats,
+        request::ResponseDataAccounter& data_accounter
+    );
 
-  static std::shared_ptr<Connection> Create(
-      engine::TaskProcessor& task_processor, const ConnectionConfig& config,
-      const request::HttpRequestConfig& handler_defaults_config,
-      engine::io::Socket peer_socket,
-      const http::RequestHandlerBase& request_handler,
-      std::shared_ptr<Stats> stats,
-      request::ResponseDataAccounter& data_accounter);
+    void Process();
 
-  // Use Create instead of this constructor
-  Connection(engine::TaskProcessor& task_processor,
-             const ConnectionConfig& config,
-             const request::HttpRequestConfig& handler_defaults_config,
-             engine::io::Socket peer_socket,
-             const http::RequestHandlerBase& request_handler,
-             std::shared_ptr<Stats> stats,
-             request::ResponseDataAccounter& data_accounter, EmplaceEnabler);
+    int Fd() const;
 
-  void SetCloseCb(CloseCb close_cb);
+private:
+    void Shutdown() noexcept;
 
-  void Start();
+    bool IsRequestTasksEmpty() const noexcept;
 
-  void Stop();  // Can be called after Start() has finished
+    void ListenForRequests() noexcept;
+    void ProcessRequest(std::shared_ptr<http::HttpRequest>&& request_ptr);
+    bool WaitOnSocket(engine::Deadline deadline);
 
-  int Fd() const;
+    engine::TaskWithResult<void> HandleQueueItem(const std::shared_ptr<http::HttpRequest>& request) noexcept;
+    void SendResponse(http::HttpRequest& request);
 
- private:
-  using QueueItem = std::pair<std::shared_ptr<request::RequestBase>,
-                              engine::TaskWithResult<void>>;
-  using Queue = concurrent::SpscQueue<QueueItem>;
+    std::string Getpeername() const;
 
-  void Shutdown() noexcept;
+    bool ReadSome();
+    std::unique_ptr<request::RequestParser> MakeParser(USERVER_NAMESPACE::http::HttpVersion ver);
+    bool TryDetectHttpVersion(std::string& buffer, std::string_view req);
 
-  bool IsRequestTasksEmpty() const noexcept;
+    const ConnectionConfig& config_;
+    const request::HttpRequestConfig& handler_defaults_config_;
+    std::unique_ptr<engine::io::RwBase> peer_socket_;
+    const http::RequestHandlerBase& request_handler_;
+    const std::shared_ptr<Stats> stats_;
+    request::ResponseDataAccounter& data_accounter_;
+    std::unique_ptr<request::RequestParser> parser_{nullptr};
+    bool is_http2_parser_{false};
 
-  void ListenForRequests(Queue::Producer) noexcept;
-  bool NewRequest(std::shared_ptr<request::RequestBase>&& request_ptr,
-                  Queue::Producer&);
+    using HttpRequestPtr = std::shared_ptr<http::HttpRequest>;
+    std::vector<HttpRequestPtr> pending_requests_;
 
-  void ProcessResponses(Queue::Consumer&) noexcept;
-  void HandleQueueItem(QueueItem& item);
-  void SendResponse(request::RequestBase& request);
+    engine::io::Sockaddr remote_address_;
+    std::string peer_name_;
 
-  engine::TaskProcessor& task_processor_;
-  const ConnectionConfig& config_;
-  const request::HttpRequestConfig& handler_defaults_config_;
-  engine::io::Socket peer_socket_;
-  const http::RequestHandlerBase& request_handler_;
-  const std::shared_ptr<Stats> stats_;
-  request::ResponseDataAccounter& data_accounter_;
-  const std::string remote_address_;
+    std::vector<char> pending_data_{};
+    size_t pending_data_size_{0};
 
-  std::shared_ptr<Queue> request_tasks_;
-  engine::SingleConsumerEvent response_sender_launched_event_;
-  engine::SingleConsumerEvent response_sender_assigned_event_;
-  engine::Task response_sender_task_;
-
-  bool is_accepting_requests_{true};
-  bool is_response_chain_valid_{true};
-  CloseCb close_cb_;
+    bool is_accepting_requests_{true};
+    bool is_response_chain_valid_{true};
 };
 
 }  // namespace server::net

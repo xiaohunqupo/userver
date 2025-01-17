@@ -3,10 +3,10 @@
 /// @file userver/testsuite/testsuite_support.hpp
 /// @brief @copybrief components::TestsuiteSupport
 
-#include <userver/components/component_fwd.hpp>
+#include <userver/components/raw_component_base.hpp>
 #include <userver/testsuite/cache_control.hpp>
-#include <userver/testsuite/component_control.hpp>
 #include <userver/testsuite/dump_control.hpp>
+#include <userver/testsuite/grpc_control.hpp>
 #include <userver/testsuite/http_allowed_urls_extra.hpp>
 #include <userver/testsuite/periodic_task_control.hpp>
 #include <userver/testsuite/postgres_control.hpp>
@@ -40,7 +40,9 @@ namespace components {
 /// testsuite-redis-timeout-connect | minimum connection timeout for redis | -
 /// testsuite-redis-timeout-single | minimum single shard timeout for redis | -
 /// testsuite-redis-timeout-all | minimum command timeout for redis | -
-/// testsuite-tasks-enabled | enable testsuite tasks facility | true if the correspoding testsuite component is available
+/// testsuite-tasks-enabled | enable testsuite tasks facility | false
+/// testsuite-increased-timeout | increase timeouts for connections, statement executions, RPC timeouts to avoid timeouts happening in testing environments, where the hardware differs from production. Overrides postgres, redis and grpc timeouts if these are missing | 0ms
+/// cache-update-execution |  If 'sequential' the caches are updated by testsuite sequentially in the order for cache component registration, which makes sense if service has components that push value into a cache component. If 'concurrent' the caches are updated concurrently with respect to the cache component dependencies. | concurrent
 ///
 /// ## Static configuration example:
 ///
@@ -48,38 +50,47 @@ namespace components {
 
 // clang-format on
 
-class TestsuiteSupport final : public components::impl::ComponentBase {
- public:
-  static constexpr std::string_view kName = "testsuite-support";
+class TestsuiteSupport final : public components::RawComponentBase {
+public:
+    /// @ingroup userver_component_names
+    /// @brief The default name of components::TestsuiteSupport
+    static constexpr std::string_view kName = "testsuite-support";
 
-  TestsuiteSupport(const components::ComponentConfig& component_config,
-                   const components::ComponentContext& component_context);
-  ~TestsuiteSupport() override;
+    TestsuiteSupport(
+        const components::ComponentConfig& component_config,
+        const components::ComponentContext& component_context
+    );
+    ~TestsuiteSupport() override;
 
-  testsuite::CacheControl& GetCacheControl();
-  testsuite::ComponentControl& GetComponentControl();
-  testsuite::DumpControl& GetDumpControl();
-  testsuite::PeriodicTaskControl& GetPeriodicTaskControl();
-  testsuite::TestpointControl& GetTestpointControl();
-  const testsuite::PostgresControl& GetPostgresControl();
-  const testsuite::RedisControl& GetRedisControl();
-  testsuite::TestsuiteTasks& GetTestsuiteTasks();
-  testsuite::HttpAllowedUrlsExtra& GetHttpAllowedUrlsExtra();
+    testsuite::CacheControl& GetCacheControl();
+    testsuite::DumpControl& GetDumpControl();
+    testsuite::PeriodicTaskControl& GetPeriodicTaskControl();
+    testsuite::TestpointControl& GetTestpointControl();
+    const testsuite::PostgresControl& GetPostgresControl();
+    const testsuite::RedisControl& GetRedisControl();
+    testsuite::TestsuiteTasks& GetTestsuiteTasks();
+    testsuite::HttpAllowedUrlsExtra& GetHttpAllowedUrlsExtra();
+    testsuite::GrpcControl& GetGrpcControl();
+    /// @returns 0 if timeout was not increased via
+    /// `testsuite-increased-timeout` static option,
+    /// `testsuite-increased-timeout` value otherwise
+    std::chrono::milliseconds GetIncreasedTimeout() const noexcept;
 
-  static yaml_config::Schema GetStaticConfigSchema();
+    static yaml_config::Schema GetStaticConfigSchema();
 
- private:
-  void OnAllComponentsAreStopping() override;
+private:
+    void OnAllComponentsAreStopping() override;
 
-  testsuite::CacheControl cache_control_;
-  testsuite::ComponentControl component_control_;
-  testsuite::DumpControl dump_control_;
-  testsuite::PeriodicTaskControl periodic_task_control_;
-  testsuite::TestpointControl testpoint_control_;
-  testsuite::PostgresControl postgres_control_;
-  testsuite::RedisControl redis_control_;
-  std::unique_ptr<testsuite::TestsuiteTasks> testsuite_tasks_;
-  testsuite::HttpAllowedUrlsExtra http_allowed_urls_extra_;
+    const std::chrono::milliseconds increased_timeout_;
+    testsuite::CacheControl cache_control_;
+    testsuite::DumpControl dump_control_;
+    testsuite::PeriodicTaskControl periodic_task_control_;
+    testsuite::TestpointControl testpoint_control_;
+    testsuite::PostgresControl postgres_control_;
+    testsuite::RedisControl redis_control_;
+    std::unique_ptr<testsuite::TestsuiteTasks> testsuite_tasks_;
+    testsuite::HttpAllowedUrlsExtra http_allowed_urls_extra_;
+    testsuite::GrpcControl grpc_control_;
 };
 
 template <>

@@ -1,3 +1,5 @@
+include_guard(GLOBAL)
+
 macro(userver_version_strip_trash VERSION_OUTPUT_VAR)
   STRING(REGEX REPLACE "^1:" "" ${VERSION_OUTPUT_VAR} "${${VERSION_OUTPUT_VAR}}")
 endmacro()
@@ -175,5 +177,43 @@ function(brew_version version_output_var brewpackage)
     else()
       message(FATAL_ERROR "Failed execute brew: ${version_error}")
     endif()
+  endif()
+endfunction()
+
+
+function(pkg_version version_output_var pkgpackage)
+  if (${version_output_var})
+    return()
+  endif()
+
+  if (NOT PKG_BIN AND NOT PKG_BIN STREQUAL "PKG_BIN-NOTFOUND")
+    find_program(PKG_BIN pkg)
+    if (NOT PKG_BIN)
+      message(STATUS "Failed to find 'pkg'")
+    endif()
+  endif()
+
+  if (NOT PKG_BIN)
+    return()
+  endif()
+
+  execute_process(
+    COMMAND ${PKG_BIN} version -n ${pkgpackage}
+    OUTPUT_VARIABLE version_output
+    ERROR_VARIABLE version_error
+    RESULT_VARIABLE version_result
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+  )
+
+  if (version_result EQUAL 0)
+    if (version_output MATCHES "^.*-([0-9.]*)")
+      set(${version_output_var} ${CMAKE_MATCH_1} PARENT_SCOPE)
+      message(STATUS "pkg version of ${pkgpackage}: ${CMAKE_MATCH_1}")
+    else()
+      set(${version_output_var} "NOT_FOUND")
+    endif()
+  else()
+    set(${version_output_var} "NOT_FOUND")
+    message(ERROR "Failed execute pkg: ${version_error}")
   endif()
 endfunction()

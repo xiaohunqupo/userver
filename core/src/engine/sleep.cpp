@@ -3,6 +3,7 @@
 #include <userver/engine/task/cancel.hpp>
 
 #include <engine/task/task_context.hpp>
+#include <userver/utils/fast_scope_guard.hpp>
 
 USERVER_NAMESPACE_BEGIN
 
@@ -11,26 +12,28 @@ namespace engine {
 namespace impl {
 namespace {
 class CommonSleepWaitStrategy final : public WaitStrategy {
- public:
-  CommonSleepWaitStrategy(Deadline deadline) : WaitStrategy(deadline) {}
+public:
+    CommonSleepWaitStrategy() = default;
 
-  void SetupWakeups() override {}
+    EarlyWakeup SetupWakeups() override { return EarlyWakeup{false}; }
 
-  void DisableWakeups() override {}
+    void DisableWakeups() noexcept override {}
 };
 }  // namespace
 }  // namespace impl
 
 void InterruptibleSleepUntil(Deadline deadline) {
-  auto& current = current_task::GetCurrentTaskContext();
-  if (current.ShouldCancel()) deadline = Deadline::Passed();
-  impl::CommonSleepWaitStrategy wait_manager(deadline);
-  current.Sleep(wait_manager);
+    auto& current = current_task::GetCurrentTaskContext();
+    const utils::FastScopeGuard reset_background([&current, previous_background_flag = current.IsBackground()](
+                                                 ) noexcept { current.SetBackground(previous_background_flag); });
+    current.SetBackground(true);
+    impl::CommonSleepWaitStrategy wait_manager{};
+    current.Sleep(wait_manager, deadline);
 }
 
 void SleepUntil(Deadline deadline) {
-  TaskCancellationBlocker block_cancel;
-  InterruptibleSleepUntil(deadline);
+    TaskCancellationBlocker block_cancel;
+    InterruptibleSleepUntil(deadline);
 }
 
 void Yield() { SleepUntil(Deadline::Passed()); }

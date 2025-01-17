@@ -1,27 +1,27 @@
-#include <userver/storages/redis/impl/exception.hpp>
+#include <userver/storages/redis/exception.hpp>
 
 #include <gtest/gtest.h>
 
-#include <userver/storages/redis/impl/base.hpp>
+#include <userver/storages/redis/base.hpp>
 
 USERVER_NAMESPACE_BEGIN
 
 TEST(Reply, RequestFailedExceptionTimeout) {
-  try {
-    throw redis::RequestFailedException("descr", redis::REDIS_ERR_TIMEOUT);
-  } catch (const redis::RequestFailedException& ex) {
-    EXPECT_TRUE(ex.IsTimeout());
-    EXPECT_EQ(ex.GetStatus(), redis::REDIS_ERR_TIMEOUT);
-  }
+    try {
+        throw storages::redis::RequestFailedException("descr", storages::redis::ReplyStatus::kTimeoutError);
+    } catch (const storages::redis::RequestFailedException& ex) {
+        EXPECT_TRUE(ex.IsTimeout());
+        EXPECT_EQ(ex.GetStatus(), storages::redis::ReplyStatus::kTimeoutError);
+    }
 }
 
-TEST(Reply, RequestFailedExceptionNotReady) {
-  try {
-    throw redis::RequestFailedException("descr", redis::REDIS_ERR_NOT_READY);
-  } catch (const redis::RequestFailedException& ex) {
-    EXPECT_FALSE(ex.IsTimeout());
-    EXPECT_EQ(ex.GetStatus(), redis::REDIS_ERR_NOT_READY);
-  }
+TEST(Reply, RequestFailedException) {
+    try {
+        throw storages::redis::RequestFailedException("descr", storages::redis::ReplyStatus::kOtherError);
+    } catch (const storages::redis::RequestFailedException& ex) {
+        EXPECT_FALSE(ex.IsTimeout());
+        EXPECT_EQ(ex.GetStatus(), storages::redis::ReplyStatus::kOtherError);
+    }
 }
 
 USERVER_NAMESPACE_END

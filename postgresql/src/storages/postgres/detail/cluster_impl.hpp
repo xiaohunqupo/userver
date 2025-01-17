@@ -5,17 +5,22 @@
 #include <vector>
 
 #include <userver/clients/dns/resolver_fwd.hpp>
+#include <userver/dynamic_config/source.hpp>
 #include <userver/engine/task/task_processor_fwd.hpp>
 #include <userver/error_injection/settings.hpp>
 #include <userver/testsuite/postgres_control.hpp>
+#include <userver/testsuite/tasks.hpp>
 
+#include <storages/postgres/connlimit_watchdog.hpp>
 #include <storages/postgres/detail/pg_impl_types.hpp>
 #include <storages/postgres/detail/pool.hpp>
-#include <storages/postgres/detail/statement_timings_storage.hpp>
+#include <storages/postgres/detail/statement_stats_storage.hpp>
 #include <storages/postgres/detail/topology/base.hpp>
 #include <userver/storages/postgres/cluster_types.hpp>
 #include <userver/storages/postgres/detail/non_transaction.hpp>
+#include <userver/storages/postgres/notify.hpp>
 #include <userver/storages/postgres/options.hpp>
+#include <userver/storages/postgres/query_queue.hpp>
 #include <userver/storages/postgres/statistics.hpp>
 #include <userver/storages/postgres/transaction.hpp>
 
@@ -24,53 +29,83 @@ USERVER_NAMESPACE_BEGIN
 namespace storages::postgres::detail {
 
 class ClusterImpl {
- public:
-  ClusterImpl(DsnList dsns, clients::dns::Resolver* resolver,
-              engine::TaskProcessor& bg_task_processor,
-              const ClusterSettings& cluster_settings,
-              const DefaultCommandControls& default_cmd_ctls,
-              const testsuite::PostgresControl& testsuite_pg_ctl,
-              const error_injection::Settings& ei_settings);
-  ~ClusterImpl();
+public:
+    ClusterImpl(
+        DsnList dsns,
+        clients::dns::Resolver* resolver,
+        engine::TaskProcessor& bg_task_processor,
+        const ClusterSettings& cluster_settings,
+        const DefaultCommandControls& default_cmd_ctls,
+        const testsuite::PostgresControl& testsuite_pg_ctl,
+        const error_injection::Settings& ei_settings,
+        testsuite::TestsuiteTasks& testsuite_tasks,
+        dynamic_config::Source config_source,
+        int shard_number
+    );
 
-  ClusterStatisticsPtr GetStatistics() const;
+    ~ClusterImpl();
 
-  Transaction Begin(ClusterHostTypeFlags, const TransactionOptions&,
-                    OptionalCommandControl);
+    ClusterStatisticsPtr GetStatistics() const;
 
-  NonTransaction Start(ClusterHostTypeFlags, OptionalCommandControl);
+    Transaction Begin(ClusterHostTypeFlags, const TransactionOptions&, OptionalCommandControl);
 
-  void SetDefaultCommandControl(CommandControl, DefaultCommandControlSource);
-  CommandControl GetDefaultCommandControl() const;
+    NonTransaction Start(ClusterHostTypeFlags, OptionalCommandControl);
 
-  void SetHandlersCommandControl(
-      const CommandControlByHandlerMap& handlers_command_control);
+    NotifyScope Listen(std::string_view channel, OptionalCommandControl);
 
-  void SetQueriesCommandControl(
-      const CommandControlByQueryMap& queries_command_control);
+    QueryQueue CreateQueryQueue(ClusterHostTypeFlags flags, TimeoutDuration acquire_timeout);
 
-  void SetConnectionSettings(const ConnectionSettings& settings);
+    void SetDefaultCommandControl(CommandControl, DefaultCommandControlSource);
+    CommandControl GetDefaultCommandControl() const;
 
-  void SetPoolSettings(const PoolSettings& settings);
+    void SetHandlersCommandControl(CommandControlByHandlerMap&& handlers_command_control);
 
-  void SetStatementMetricsSettings(const StatementMetricsSettings& settings);
+    void SetQueriesCommandControl(CommandControlByQueryMap&& queries_command_control);
 
-  void SetPipelineMode(PipelineMode mode);
+    void SetConnectionSettings(const ConnectionSettings& settings);
 
-  OptionalCommandControl GetQueryCmdCtl(const std::string& query_name) const;
+    void SetPoolSettings(const PoolSettings& settings);
 
-  OptionalCommandControl GetTaskDataHandlersCommandControl() const;
+    void SetTopologySettings(const TopologySettings& settings);
 
- private:
-  using ConnectionPoolPtr = std::shared_ptr<ConnectionPool>;
+    void SetStatementMetricsSettings(const StatementMetricsSettings& settings);
 
-  ConnectionPoolPtr FindPool(ClusterHostTypeFlags);
+    OptionalCommandControl GetQueryCmdCtl(const std::string& query_name) const;
 
-  DefaultCommandControls default_cmd_ctls_;
-  std::unique_ptr<topology::TopologyBase> topology_;
-  engine::TaskProcessor& bg_task_processor_;
-  std::vector<ConnectionPoolPtr> host_pools_;
-  std::atomic<uint32_t> rr_host_idx_;
+    OptionalCommandControl GetTaskDataHandlersCommandControl() const;
+
+    std::string GetDbName() const;
+
+    void SetDsnList(const DsnList&);
+
+private:
+    void OnConnlimitChanged();
+
+    bool IsConnlimitModeAuto(const ClusterSettings& settings);
+
+    using ConnectionPoolPtr = std::shared_ptr<ConnectionPool>;
+
+    ConnectionPoolPtr FindPool(ClusterHostTypeFlags);
+
+    struct TopologyData {
+        std::unique_ptr<topology::TopologyBase> topology;
+        std::vector<ConnectionPoolPtr> host_pools;
+    };
+
+    void CreateTopology(const DsnList& dsns);
+
+    rcu::Variable<ClusterSettings> cluster_settings_;
+    concurrent::Variable<TopologyData, engine::SharedMutex> topology_data_;
+    clients::dns::Resolver* resolver_{};
+    engine::TaskProcessor& bg_task_processor_;
+    dynamic_config::Source config_source_;
+    DefaultCommandControls default_cmd_ctls_;
+    const testsuite::PostgresControl testsuite_pg_ctl_;
+    const error_injection::Settings ei_settings_;
+
+    std::atomic<uint32_t> rr_host_idx_;
+    std::atomic<bool> connlimit_mode_auto_enabled_;
+    ConnlimitWatchdog connlimit_watchdog_;
 };
 
 }  // namespace storages::postgres::detail

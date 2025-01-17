@@ -12,6 +12,8 @@
 
 /// @page clickhouse_driver ClickHouse Driver
 ///
+/// **Quality:** @ref QUALITY_TIERS "Golden Tier".
+///
 /// 🐙 **userver** provides access to ClickHouse databases servers via
 /// components::ClickHouse. The uClickHouse driver is asynchronous, it suspends
 /// current coroutine for carrying out network I/O.
@@ -30,28 +32,27 @@
 /// ----------
 ///
 /// @htmlonly <div class="bottom-nav"> @endhtmlonly
-/// ⇦ @ref md_en_userver_redis | @ref md_en_userver_development_stability ⇨
+/// ⇦ @ref scripts/docs/en/userver/redis.md |
+/// @ref scripts/docs/en/userver/libraries/easy.md ⇨
 /// @htmlonly </div> @endhtmlonly
 
 USERVER_NAMESPACE_BEGIN
 
-namespace storages {
 /// @brief Top namespace for uClickHouse driver.
 ///
 /// For more information see @ref clickhouse_driver.
-namespace clickhouse {
+namespace storages::clickhouse {}
+
 /// @brief uClickHouse input-output.
 ///
 /// Namespace containing classes and functions for defining datatype
 /// input-output and specifying mapping between C++ and ClickHouse types.
-namespace io {
+namespace storages::clickhouse::io {}
+
 /// @brief uClickHouse columns.
 ///
 /// Namespace containing definitions of supported ClickHouse column types.
 /// For more information see @ref userver_clickhouse_types
-namespace columns {}
-}  // namespace io
-}  // namespace clickhouse
-}  // namespace storages
+namespace storages::clickhouse::io::columns {}
 
 USERVER_NAMESPACE_END

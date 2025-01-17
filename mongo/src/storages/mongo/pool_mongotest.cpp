@@ -21,61 +21,111 @@ USERVER_NAMESPACE_BEGIN
 
 namespace mongo = storages::mongo;
 
-UTEST(Pool, CollectionAccess) {
-  static const std::string kSysVerCollName = "system.version";
-  static const std::string kNonexistentCollName = "nonexistent";
+namespace {
+class Pool : public MongoPoolFixture {};
+}  // namespace
 
-  auto dns_resolver = MakeDnsResolver();
-  // this database always exists
-  auto admin_pool = MakeTestsuiteMongoPool("admin", &dns_resolver);
-  // this one should not exist
-  auto test_pool = MakeTestsuiteMongoPool("pool_test", &dns_resolver);
+UTEST_F(Pool, CollectionAccess) {
+    static const std::string kSysVerCollName = "system.version";
+    static const std::string kNonexistentCollName = "nonexistent";
 
-  EXPECT_TRUE(admin_pool.HasCollection(kSysVerCollName));
-  UEXPECT_NO_THROW(admin_pool.GetCollection(kSysVerCollName));
+    // this database always exists
+    auto admin_pool = MakePool("admin", {});
+    // this one should not exist yet
+    auto test_pool = MakePool(kTestDatabaseDefaultName, {});
 
-  EXPECT_FALSE(test_pool.HasCollection(kSysVerCollName));
-  UEXPECT_NO_THROW(test_pool.GetCollection(kSysVerCollName));
+    EXPECT_TRUE(admin_pool.HasCollection(kSysVerCollName));
+    UEXPECT_NO_THROW(admin_pool.GetCollection(kSysVerCollName));
 
-  EXPECT_FALSE(admin_pool.HasCollection(kNonexistentCollName));
-  UEXPECT_NO_THROW(admin_pool.GetCollection(kNonexistentCollName));
+    EXPECT_FALSE(test_pool.HasCollection(kSysVerCollName));
+    UEXPECT_NO_THROW(test_pool.GetCollection(kSysVerCollName));
 
-  EXPECT_FALSE(test_pool.HasCollection(kNonexistentCollName));
-  UEXPECT_NO_THROW(test_pool.GetCollection(kNonexistentCollName));
+    EXPECT_FALSE(admin_pool.HasCollection(kNonexistentCollName));
+    UEXPECT_NO_THROW(admin_pool.GetCollection(kNonexistentCollName));
+
+    EXPECT_FALSE(test_pool.HasCollection(kNonexistentCollName));
+    UEXPECT_NO_THROW(test_pool.GetCollection(kNonexistentCollName));
 }
 
-UTEST(Pool, ConnectionFailure) {
-  auto dns_resolver = MakeDnsResolver();
+UTEST_F(Pool, DropDatabase) {
+    static const std::string kCollName = "test";
 
-  // constructor should not throw
-  mongo::Pool bad_pool("bad", "mongodb://%2Fnonexistent.sock/bad",
-                       {"bad", mongo::PoolConfig::DriverImpl::kMongoCDriver},
-                       &dns_resolver, {});
-  UEXPECT_THROW(bad_pool.HasCollection("test"),
-                mongo::ClusterUnavailableException);
+    auto& pool = GetDefaultPool();
+    auto coll = pool.GetCollection(kCollName);
+
+    UEXPECT_NO_THROW(coll.InsertOne(formats::bson::MakeDoc("_id", 42)));
+    EXPECT_TRUE(pool.HasCollection(kCollName));
+
+    UEXPECT_NO_THROW(pool.DropDatabase());
+    EXPECT_FALSE(pool.HasCollection(kCollName));
+
+    UEXPECT_NO_THROW(coll.InsertOne(formats::bson::MakeDoc("_id", 42)));
+    EXPECT_TRUE(pool.HasCollection(kCollName));
 }
 
-UTEST(Pool, Limits) {
-  auto dns_resolver = MakeDnsResolver();
-  mongo::PoolConfig limited_config{
-      "limited", mongo::PoolConfig::DriverImpl::kMongoCDriver};
-  limited_config.max_size = 1;
-  auto limited_pool =
-      MakeTestsuiteMongoPool("limits_test", limited_config, &dns_resolver);
+UTEST(NonexistentPool, ConnectionFailure) {
+    auto dns_resolver = MakeDnsResolver();
+    auto dynamic_config = MakeDynamicConfig();
 
-  std::vector<formats::bson::Document> docs;
-  docs.reserve(150);
-  /// large enough to not fit into a single batch
-  for (int i = 0; i < 150; ++i) {
-    docs.push_back(formats::bson::MakeDoc("_id", i));
-  }
-  limited_pool.GetCollection("test").InsertMany(std::move(docs));
+    // constructor should not throw
+    mongo::Pool bad_pool("bad", "mongodb://%2Fnonexistent.sock/bad", {}, &dns_resolver, dynamic_config.GetSource());
+    UEXPECT_THROW(bad_pool.HasCollection("test"), mongo::ClusterUnavailableException);
+}
 
-  auto cursor = limited_pool.GetCollection("test").Find({});
+UTEST_F(Pool, Limits) {
+    auto limited_config = MakeTestPoolConfig();
+    limited_config.pool_settings.initial_size = 1;
+    limited_config.pool_settings.idle_limit = 1;
+    limited_config.pool_settings.max_size = 1;
+    auto limited_pool = MakePool({}, limited_config);
 
-  auto second_find = engine::AsyncNoSpan(
-      [&limited_pool] { limited_pool.GetCollection("test").Find({}); });
-  UEXPECT_THROW(second_find.Get(), mongo::MongoException);
+    std::vector<formats::bson::Document> docs;
+    docs.reserve(150);
+    /// large enough to not fit into a single batch
+    for (int i = 0; i < 150; ++i) {
+        docs.push_back(formats::bson::MakeDoc("_id", i));
+    }
+    limited_pool.GetCollection("test").InsertMany(std::move(docs));
+
+    auto cursor = limited_pool.GetCollection("test").Find({});
+
+    auto second_find = engine::AsyncNoSpan([&limited_pool] { limited_pool.GetCollection("test").Find({}); });
+    UEXPECT_THROW(second_find.Get(), mongo::MongoException);
+}
+
+UTEST_F(Pool, ListCollectionNames) {
+    static const std::string kCollAName = "list_test_a";
+    static const std::string kCollBName = "list_test_b";
+
+    auto& pool = GetDefaultPool();
+    EXPECT_EQ(0, pool.ListCollectionNames().size());
+
+    {
+        auto coll = pool.GetCollection(kCollAName);
+        UEXPECT_NO_THROW(coll.InsertOne(formats::bson::MakeDoc("_id", 42)));
+
+        auto list_collections = pool.ListCollectionNames();
+        EXPECT_EQ(1, list_collections.size());
+        EXPECT_EQ(kCollAName, list_collections[0]);
+    }
+    {
+        auto coll = pool.GetCollection(kCollBName);
+        UEXPECT_NO_THROW(coll.InsertOne(formats::bson::MakeDoc("_id", 42)));
+
+        auto list_collections = pool.ListCollectionNames();
+        std::sort(list_collections.begin(), list_collections.end());
+        EXPECT_EQ(2, list_collections.size());
+        EXPECT_EQ(kCollAName, list_collections[0]);
+        EXPECT_EQ(kCollBName, list_collections[1]);
+    }
+    {
+        auto coll = pool.GetCollection(kCollAName);
+        UEXPECT_NO_THROW(coll.Drop());
+
+        auto list_collections = pool.ListCollectionNames();
+        EXPECT_EQ(1, list_collections.size());
+        EXPECT_EQ(kCollBName, list_collections[0]);
+    }
 }
 
 USERVER_NAMESPACE_END

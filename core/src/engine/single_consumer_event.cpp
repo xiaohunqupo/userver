@@ -2,84 +2,79 @@
 
 #include <engine/impl/wait_list_light.hpp>
 #include <engine/task/task_context.hpp>
+#include <userver/logging/log.hpp>
+#include <userver/utils/assert.hpp>
 
 USERVER_NAMESPACE_BEGIN
 
 namespace engine {
 
 class SingleConsumerEvent::EventWaitStrategy final : public impl::WaitStrategy {
- public:
-  EventWaitStrategy(SingleConsumerEvent& event, impl::TaskContext& current,
-                    Deadline deadline)
-      : WaitStrategy(deadline), event_(event), current_(current) {}
+public:
+    EventWaitStrategy(SingleConsumerEvent& event, impl::TaskContext& current) : event_(event), current_(current) {}
 
-  void SetupWakeups() override {
-    event_.waiters_->Append(&current_);
-    if (event_.is_signaled_.load()) event_.waiters_->WakeupOne();
-  }
+    impl::EarlyWakeup SetupWakeups() override {
+        return impl::EarlyWakeup{event_.waiters_->GetSignalOrAppend(&current_)};
+    }
 
-  void DisableWakeups() override { event_.waiters_->Remove(current_); }
+    void DisableWakeups() noexcept override { event_.waiters_->Remove(current_); }
 
- private:
-  SingleConsumerEvent& event_;
-  impl::TaskContext& current_;
+private:
+    SingleConsumerEvent& event_;
+    impl::TaskContext& current_;
 };
 
 SingleConsumerEvent::SingleConsumerEvent() noexcept = default;
 
-SingleConsumerEvent::SingleConsumerEvent(NoAutoReset) noexcept
-    : is_auto_reset_(false) {}
+SingleConsumerEvent::SingleConsumerEvent(NoAutoReset) noexcept : is_auto_reset_(false) {}
 
 SingleConsumerEvent::~SingleConsumerEvent() = default;
 
-bool SingleConsumerEvent::IsAutoReset() const noexcept {
-  return is_auto_reset_;
-}
+bool SingleConsumerEvent::IsAutoReset() const noexcept { return is_auto_reset_; }
 
-bool SingleConsumerEvent::WaitForEvent() {
-  return WaitForEventUntil(Deadline{});
-}
+bool SingleConsumerEvent::WaitForEvent() { return WaitForEventUntil(Deadline{}); }
 
 bool SingleConsumerEvent::WaitForEventUntil(Deadline deadline) {
-  if (GetIsSignaled()) {
-    return true;  // optimistic path
-  }
-
-  impl::TaskContext& current = current_task::GetCurrentTaskContext();
-  if (current.ShouldCancel()) return GetIsSignaled();
-
-  LOG_TRACE() << "WaitForEventUntil()";
-  EventWaitStrategy wait_manager(*this, current, deadline);
-
-  bool was_signaled = false;
-  while (!(was_signaled = GetIsSignaled()) && !current.ShouldCancel()) {
-    LOG_TRACE() << "iteration()";
-
-    if (current.Sleep(wait_manager) !=
-        impl::TaskContext::WakeupSource::kWaitList) {
-      return false;
+    if (GetIsSignaled()) {
+        return true;  // optimistic path
     }
-  }
-  LOG_TRACE() << "exit";
 
-  return was_signaled;
+    impl::TaskContext& current = current_task::GetCurrentTaskContext();
+    LOG_TRACE() << "WaitForEventUntil()";
+    EventWaitStrategy wait_manager{*this, current};
+
+    while (true) {
+        if (GetIsSignaled()) {
+            LOG_TRACE() << "success";
+            return true;
+        }
+
+        LOG_TRACE() << "iteration()";
+
+        const auto wakeup_source = current.Sleep(wait_manager, deadline);
+        if (!impl::HasWaitSucceeded(wakeup_source)) {
+            LOG_TRACE() << "failure";
+            return false;
+        }
+    }
 }
 
-void SingleConsumerEvent::Reset() noexcept {
-  is_signaled_.store(false, std::memory_order_release);
-}
+void SingleConsumerEvent::Reset() noexcept { waiters_->GetAndResetSignal(); }
 
-void SingleConsumerEvent::Send() {
-  is_signaled_.store(true, std::memory_order_release);
-  waiters_->WakeupOne();
-}
+void SingleConsumerEvent::Send() { waiters_->SetSignalAndWakeupOne(); }
+
+bool SingleConsumerEvent::IsReady() const noexcept { return waiters_->IsSignaled(); }
 
 bool SingleConsumerEvent::GetIsSignaled() noexcept {
-  if (is_auto_reset_) {
-    return is_signaled_.exchange(false);
-  } else {
-    return is_signaled_.load(std::memory_order_acquire);
-  }
+    if (is_auto_reset_) {
+        return waiters_->GetAndResetSignal();
+    } else {
+        return waiters_->IsSignaled();
+    }
+}
+
+void SingleConsumerEvent::CheckIsAutoResetForWaitPredicate() {
+    UINVARIANT(IsAutoReset(), "Wait with predicate requires auto-reset functionality");
 }
 
 }  // namespace engine

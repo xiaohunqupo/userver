@@ -14,8 +14,12 @@ USERVER_NAMESPACE_BEGIN
 
 namespace {
 
+struct DataWithUuidMismatchedEndianness final {
+    std::vector<boost::uuids::uuid> uuids;
+};
+
 struct DataWithUuid final {
-  std::vector<boost::uuids::uuid> uuids;
+    std::vector<boost::uuids::uuid> uuids;
 };
 
 }  // namespace
@@ -23,27 +27,42 @@ struct DataWithUuid final {
 namespace storages::clickhouse::io {
 
 template <>
+struct CppToClickhouse<DataWithUuidMismatchedEndianness> {
+    using mapped_type = std::tuple<columns::MismatchedEndiannessUuidColumn>;
+};
+
+template <>
 struct CppToClickhouse<DataWithUuid> {
-  using mapped_type = std::tuple<columns::UuidColumn>;
+    using mapped_type = std::tuple<columns::UuidRfc4122Column>;
 };
 
 }  // namespace storages::clickhouse::io
 
-UTEST(Uuid, InsertSelect) {
-  ClusterWrapper cluster{};
-  cluster->Execute(
-      "CREATE TEMPORARY TABLE IF NOT EXISTS tmp_table "
-      "(value UUID)");
+namespace {
 
-  const auto uuid = utils::generators::GenerateBoostUuid();
+template <typename UuidType>
+void PerformInsertSelect() {
+    ClusterWrapper cluster{};
+    cluster->Execute(
+        "CREATE TEMPORARY TABLE IF NOT EXISTS tmp_table "
+        "(value UUID)"
+    );
 
-  const DataWithUuid insert_data{{uuid}};
-  cluster->Insert("tmp_table", {"value"}, insert_data);
+    const auto uuid = utils::generators::GenerateBoostUuid();
 
-  const auto select_data =
-      cluster->Execute("SELECT value FROM tmp_table").As<DataWithUuid>();
-  EXPECT_EQ(select_data.uuids.size(), 1);
-  EXPECT_EQ(select_data.uuids.front(), insert_data.uuids.front());
+    const UuidType insert_data{{uuid}};
+    cluster->Insert("tmp_table", {"value"}, insert_data);
+
+    const auto select_data = cluster->Execute("SELECT value FROM tmp_table").As<UuidType>();
+
+    EXPECT_EQ(select_data.uuids.size(), 1);
+    EXPECT_EQ(select_data.uuids.front(), insert_data.uuids.front());
 }
+
+}  // namespace
+
+UTEST(Uuid, MismatchedEndiannessInsertSelect) { PerformInsertSelect<DataWithUuidMismatchedEndianness>(); }
+
+UTEST(Uuid, CorrectEndiannessInsertSelect) { PerformInsertSelect<DataWithUuid>(); }
 
 USERVER_NAMESPACE_END

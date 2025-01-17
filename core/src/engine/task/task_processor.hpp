@@ -1,21 +1,23 @@
 #pragma once
 
 #include <atomic>
-#include <condition_variable>
 #include <cstdint>
 #include <functional>
 #include <memory>
 #include <thread>
-#include <unordered_set>
+#include <variant>
 #include <vector>
 
-#include <moodycamel/blockingconcurrentqueue.h>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
-#include <engine/task/counted_coroutine_ptr.hpp>
 #include <engine/task/task_counter.hpp>
 #include <engine/task/task_processor_config.hpp>
+#include <engine/task/task_queue.hpp>
+#include <engine/task/work_stealing_queue/task_queue.hpp>
+#include <userver/concurrent/impl/interference_shield.hpp>
 #include <userver/engine/impl/detached_tasks_sync_block.hpp>
+#include <userver/logging/logger.hpp>
+#include <utils/statistics/thread_statistics.hpp>
 
 USERVER_NAMESPACE_BEGIN
 
@@ -24,6 +26,7 @@ namespace engine {
 namespace impl {
 class TaskContext;
 class TaskProcessorPools;
+class CountedCoroutinePtr;
 }  // namespace impl
 
 namespace ev {
@@ -31,81 +34,98 @@ class ThreadPool;
 }  // namespace ev
 
 class TaskProcessor final {
- public:
-  TaskProcessor(TaskProcessorConfig, std::shared_ptr<impl::TaskProcessorPools>);
-  ~TaskProcessor();
+public:
+    TaskProcessor(TaskProcessorConfig, std::shared_ptr<impl::TaskProcessorPools>);
+    ~TaskProcessor();
 
-  void InitiateShutdown();
+    void InitiateShutdown();
 
-  void Schedule(impl::TaskContext*);
+    void Schedule(impl::TaskContext*);
 
-  void Adopt(impl::TaskContext& context);
+    void Adopt(impl::TaskContext& context);
 
-  impl::CountedCoroutinePtr GetCoroutine();
+    impl::CountedCoroutinePtr GetCoroutine();
 
-  ev::ThreadPool& EventThreadPool();
+    ev::ThreadPool& EventThreadPool();
 
-  std::shared_ptr<impl::TaskProcessorPools> GetTaskProcessorPools() {
-    return pools_;
-  }
+    std::shared_ptr<impl::TaskProcessorPools> GetTaskProcessorPools() { return pools_; }
 
-  const std::string& Name() const { return config_.name; }
+    const std::string& Name() const { return config_.name; }
 
-  impl::TaskCounter& GetTaskCounter() noexcept { return task_counter_; }
+    impl::TaskCounter& GetTaskCounter() noexcept { return task_counter_; }
 
-  const impl::TaskCounter& GetTaskCounter() const { return task_counter_; }
+    const impl::TaskCounter& GetTaskCounter() const { return task_counter_; }
 
-  size_t GetTaskQueueSize() const { return task_queue_.size_approx(); }
+    std::size_t GetTaskQueueSize() const;
 
-  size_t GetWorkerCount() const { return workers_.size(); }
+    std::size_t GetWorkerCount() const { return workers_.size(); }
 
-  void SetSettings(const TaskProcessorSettings& settings);
+    void SetSettings(const TaskProcessorSettings& settings);
 
-  std::chrono::microseconds GetProfilerThreshold() const;
+    std::chrono::microseconds GetProfilerThreshold() const;
 
-  bool ShouldProfilerForceStacktrace() const;
+    bool ShouldProfilerForceStacktrace() const;
 
-  size_t GetTaskTraceMaxCswForNewTask() const;
+    std::size_t GetTaskTraceMaxCswForNewTask() const;
 
-  const std::string& GetTaskTraceLoggerName() const;
+    const std::string& GetTaskTraceLoggerName() const;
 
-  void SetTaskTraceLogger(logging::LoggerPtr logger);
+    void SetTaskTraceLogger(logging::LoggerPtr logger);
 
-  logging::LoggerPtr GetTaskTraceLogger() const;
+    logging::LoggerPtr GetTaskTraceLogger() const;
 
- private:
-  void Cleanup() noexcept;
+    std::vector<std::uint8_t> CollectCurrentLoadPct() const;
 
-  impl::TaskContext* DequeueTask();
+private:
+    // Contains queue size cache when overloaded by length, 0 otherwise.
+    using OverloadByLength = std::size_t;
 
-  void ProcessTasks() noexcept;
+    struct OverloadedCache final {
+        std::atomic<bool> overloaded_by_wait_time{false};
+        std::atomic<OverloadByLength> overload_by_length{0};
+    };
 
-  void CheckWaitTime(impl::TaskContext& context);
+    void Cleanup() noexcept;
 
-  void HandleOverload(impl::TaskContext& context);
+    void PrepareWorkerThread(std::size_t index) noexcept;
 
-  const TaskProcessorConfig config_;
-  std::atomic<std::chrono::microseconds> task_profiler_threshold_;
-  std::atomic<bool> profiler_force_stacktrace_{false};
+    void FinalizeWorkerThread() noexcept;
 
-  std::shared_ptr<impl::TaskProcessorPools> pools_;
+    void ProcessTasks() noexcept;
 
-  std::atomic<bool> is_shutting_down_;
-  impl::DetachedTasksSyncBlock detached_contexts_;
+    void CheckWaitTime(impl::TaskContext& context);
 
-  moodycamel::BlockingConcurrentQueue<impl::TaskContext*> task_queue_;
+    void SetTaskQueueWaitTimeOverloaded(bool new_value) noexcept;
 
-  std::atomic<std::chrono::microseconds> sensor_task_queue_wait_time_{};
-  std::atomic<std::chrono::microseconds> max_task_queue_wait_time_{};
-  std::atomic<size_t> max_task_queue_wait_length_{0};
-  TaskProcessorSettings::OverloadAction overload_action_{
-      TaskProcessorSettings::OverloadAction::kIgnore};
-  std::atomic<bool> task_queue_wait_time_overloaded_{false};
+    void HandleOverload(impl::TaskContext& context, TaskProcessorSettings::OverloadAction);
 
-  std::vector<std::thread> workers_;
-  impl::TaskCounter task_counter_;
-  std::atomic<bool> task_trace_logger_set_{false};
-  logging::LoggerPtr task_trace_logger_{nullptr};
+    OverloadByLength GetOverloadByLength(std::size_t max_queue_length) noexcept;
+
+    OverloadByLength
+    ComputeOverloadByLength(OverloadByLength old_overload_by_length, std::size_t max_queue_length) noexcept;
+
+    concurrent::impl::InterferenceShield<impl::DetachedTasksSyncBlock> detached_contexts_{
+        impl::DetachedTasksSyncBlock::StopMode::kCancel};
+    concurrent::impl::InterferenceShield<OverloadedCache> overloaded_cache_;
+    std::variant<TaskQueue, WorkStealingTaskQueue> task_queue_;
+    impl::TaskCounter task_counter_;
+
+    const TaskProcessorConfig config_;
+    const std::shared_ptr<impl::TaskProcessorPools> pools_;
+    std::vector<std::thread> workers_;
+    logging::LoggerPtr task_trace_logger_{nullptr};
+
+    std::atomic<std::chrono::microseconds> task_profiler_threshold_{{}};
+    std::atomic<std::chrono::microseconds> sensor_task_queue_wait_time_{{}};
+
+    std::atomic<std::chrono::microseconds> action_bit_and_max_task_queue_wait_time_{{}};
+    std::atomic<std::int64_t> action_bit_and_max_task_queue_wait_length_{0};
+
+    std::atomic<bool> profiler_force_stacktrace_{false};
+    std::atomic<bool> is_shutting_down_{false};
+    std::atomic<bool> task_trace_logger_set_{false};
+
+    std::unique_ptr<utils::statistics::ThreadPoolCpuStatsStorage> cpu_stats_storage_{nullptr};
 };
 
 /// Register a function that runs on all threads on task processor creation.

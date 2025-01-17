@@ -1,7 +1,7 @@
 #pragma once
 
 /// @file userver/fs/read.hpp
-/// @brief functions for asyncronous file read operations
+/// @brief functions for asynchronous file read operations
 
 #include <memory>
 #include <string>
@@ -17,20 +17,25 @@ namespace fs {
 
 /// @brief Struct file with load data
 struct FileInfoWithData {
-  std::string data;
-  std::string extension;
-  size_t size;
+    std::string data;
+    std::string extension;
 };
 
 using FileInfoWithDataConstPtr = std::shared_ptr<const FileInfoWithData>;
-using FileInfoWithDataMap =
-    std::unordered_map<std::string, FileInfoWithDataConstPtr>;
+using FileInfoWithDataMap = std::unordered_map<std::string, FileInfoWithDataConstPtr>;
 
 enum class SettingsReadFile {
-  kNone = 0,
-  /// Skip hidden files,
-  kSkipHidden = 1 << 0,
+    kNone = 0,
+    /// Skip hidden files,
+    kSkipHidden = 1 << 0,
 };
+
+/// @brief Returns relative path from full path
+/// @param path full path, must start with `dir`
+/// @param dir directory path to get relative path
+/// @note it does not access filesystem, the relative path is calculated
+/// lexically.
+std::string GetLexicallyRelative(std::string_view path, std::string_view dir);
 
 /// @brief Returns files from recursively traversed directory
 /// @param async_tp TaskProcessor for synchronous waiting
@@ -40,8 +45,10 @@ enum class SettingsReadFile {
 /// @throws std::runtime_error if read fails for any reason (e.g. no such file,
 /// read error, etc.),
 FileInfoWithDataMap ReadRecursiveFilesInfoWithData(
-    engine::TaskProcessor& async_tp, const std::string& path,
-    utils::Flags<SettingsReadFile> flags = {SettingsReadFile::kSkipHidden});
+    engine::TaskProcessor& async_tp,
+    const std::string& path,
+    utils::Flags<SettingsReadFile> flags = {SettingsReadFile::kSkipHidden}
+);
 
 /// @brief Reads file contents asynchronously
 /// @param async_tp TaskProcessor for synchronous waiting
@@ -49,10 +56,9 @@ FileInfoWithDataMap ReadRecursiveFilesInfoWithData(
 /// @returns file contents
 /// @throws std::runtime_error if read fails for any reason (e.g. no such file,
 /// read error, etc.),
-std::string ReadFileContents(engine::TaskProcessor& async_tp,
-                             const std::string& path);
+std::string ReadFileContents(engine::TaskProcessor& async_tp, const std::string& path);
 
-/// @brief Checks whether the file exists asynchronosly
+/// @brief Checks whether the file exists asynchronously
 /// @param async_tp TaskProcessor for synchronous waiting
 /// @param path file path to check
 /// @returns true if file exists, false if file doesn't exist

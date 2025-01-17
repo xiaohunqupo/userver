@@ -3,8 +3,11 @@
 /// @file userver/engine/single_use_event.hpp
 /// @brief @copybrief engine::SingleUseEvent
 
-#include <atomic>
-#include <cstdint>
+#include <userver/engine/deadline.hpp>
+#include <userver/engine/future_status.hpp>
+#include <userver/engine/impl/context_accessor.hpp>
+#include <userver/engine/impl/wait_list_fwd.hpp>
+#include <userver/utils/fast_pimpl.hpp>
 
 USERVER_NAMESPACE_BEGIN
 
@@ -12,53 +15,80 @@ namespace engine {
 
 /// @ingroup userver_concurrency
 ///
-/// @brief A single-producer, single-consumer event
+/// @brief A single-producer, single-consumer event.
 ///
-/// Must not be awaited or signaled multiple times in the same waiting session.
+/// Once the producer sends the event, it remains in the signaled state forever.
 ///
-/// The main advantage of `SingleUseEvent` over `SingleConsumerEvent` is that
-/// the waiting coroutine is allowed to immediately destroy the `SingleUseEvent`
+/// SingleUseEvent can be used as a faster non-allocating alternative
+/// to engine::Future. However, it is more low-level and error-prone, see below.
+///
+/// Compatible with engine::WaitAny and friends.
+///
+/// ## Destroying a SingleUseEvent after waking up
+///
+/// The waiting coroutine is allowed to immediately destroy the `SingleUseEvent`
 /// after waking up; it will not stop a concurrent `Send` from completing
-/// correctly.
+/// correctly. This is contrary to the properties of other userver
+/// synchronization primitives, like engine::Mutex.
 ///
-/// Timeouts and cancellations are not supported. Only a concurrent call to
-/// `Send` can wake up the waiter. This is necessary for the waiter not to
-/// destroy the `SingleUseEvent` unexpectedly for the sender.
+/// However, if the wait operation ends in something other than
+/// engine::Future::kReady, then it is the responsibility of the waiter
+/// to guarantee that it either prevents the oncoming `Send` call or awaits it.
+/// One way to force waiting until the `Send` call happens is to use
+/// engine::SingleUseEvent::WaitNonCancellable.
 ///
-/// ## Example usage:
+/// ## Example usage
 ///
-/// @snippet engine/single_use_event.cpp  Sample engine::SingleUseEvent usage
+/// @snippet engine/single_use_event_test.cpp  Wait and destroy
 ///
-/// @see @ref md_en_userver_synchronization
-class SingleUseEvent final {
- public:
-  constexpr SingleUseEvent() noexcept : state_(0) {}
-  ~SingleUseEvent();
+/// @see @ref scripts/docs/en/userver/synchronization.md
+class SingleUseEvent final : private impl::ContextAccessor {
+public:
+    SingleUseEvent() noexcept;
 
-  SingleUseEvent(const SingleUseEvent&) = delete;
-  SingleUseEvent(SingleUseEvent&&) = delete;
-  SingleUseEvent& operator=(const SingleUseEvent&) = delete;
-  SingleUseEvent& operator=(SingleUseEvent&&) = delete;
+    SingleUseEvent(const SingleUseEvent&) = delete;
+    SingleUseEvent(SingleUseEvent&&) = delete;
+    SingleUseEvent& operator=(const SingleUseEvent&) = delete;
+    SingleUseEvent& operator=(SingleUseEvent&&) = delete;
+    ~SingleUseEvent();
 
-  /// @brief Waits until the event is in a signaled state
-  ///
-  /// The event then remains in a signaled state, it does not reset
-  /// automatically.
-  ///
-  /// The waiter coroutine can destroy the `SingleUseEvent` object immediately
-  /// after waking up, if necessary.
-  void WaitNonCancellable() noexcept;
+    /// @brief Waits until the event is in a signaled state.
+    ///
+    /// @throws engine::WaitInterruptedException if the current task is cancelled
+    void Wait();
 
-  /// Sets the signal flag and wakes a coroutine that waits on it, if any.
-  /// `Send` must not be called again without `Reset`.
-  void Send() noexcept;
+    /// @brief Waits until the event is in a signaled state, or the deadline
+    /// expires, or the current task is cancelled.
+    [[nodiscard]] FutureStatus WaitUntil(Deadline);
 
-  /// Resets the signal flag. Can be called after `WaitNonCancellable` returns
-  /// if necessary to reuse the `SingleUseEvent` for another waiting session.
-  void Reset() noexcept;
+    /// @brief Waits until the event is in a signaled state, ignoring task
+    /// cancellations.
+    ///
+    /// The waiter coroutine can destroy the `SingleUseEvent` object immediately
+    /// after waking up, if necessary.
+    void WaitNonCancellable() noexcept;
 
- private:
-  std::atomic<std::uintptr_t> state_;
+    /// Sets the signal flag and wakes a coroutine that waits on it, if any.
+    /// `Send` must not be called again.
+    void Send() noexcept;
+
+    /// Returns true iff already signaled.
+    [[nodiscard]] bool IsReady() const noexcept override;
+
+    /// @cond
+    // For internal use only.
+    impl::ContextAccessor* TryGetContextAccessor() noexcept { return this; }
+    /// @endcond
+
+private:
+    friend class impl::FutureWaitStrategy<SingleUseEvent>;
+
+    impl::EarlyWakeup TryAppendWaiter(impl::TaskContext& waiter) override;
+    void RemoveWaiter(impl::TaskContext& waiter) noexcept override;
+    void RethrowErrorResult() const override;
+    void AfterWait() noexcept override;
+
+    impl::FastPimplWaitListLight waiters_;
 };
 
 }  // namespace engine

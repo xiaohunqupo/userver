@@ -5,6 +5,7 @@
 #include <userver/engine/async.hpp>
 #include <userver/engine/sleep.hpp>
 
+#include <userver/engine/task/task_base.hpp>
 #include <userver/utest/utest.hpp>
 
 USERVER_NAMESPACE_BEGIN
@@ -17,10 +18,8 @@ USERVER_NAMESPACE_BEGIN
 // an unexpected context.
 namespace {
 class DtorInCoroChecker final {
- public:
-  ~DtorInCoroChecker() {
-    EXPECT_NE(nullptr, engine::current_task::GetCurrentTaskContextUnchecked());
-  }
+public:
+    ~DtorInCoroChecker() { EXPECT_TRUE(engine::current_task::IsTaskProcessorThread()); }
 };
 
 // TAXICOMMON-4406 -- Wait list notification before cleanup gets lost
@@ -29,22 +28,23 @@ class DtorInCoroChecker final {
 // list in the process of housekeeping. This notification was not accounted as a
 // wakeup source because wakeup source was calculated early.
 struct WaitListRaceSimulator final : public engine::impl::WaitStrategy {
-  // cannot use passed deadline because of fast path
-  WaitListRaceSimulator() : WaitStrategy{engine::Deadline{}} {}
+    // cannot use passed deadline because of fast path
+    WaitListRaceSimulator() = default;
 
-  void SetupWakeups() override {
-    // wake up immediately
-    engine::current_task::GetCurrentTaskContext().Wakeup(
-        engine::impl::TaskContext::WakeupSource::kDeadlineTimer,
-        engine::impl::SleepState::Epoch{0});
-  }
+    engine::impl::EarlyWakeup SetupWakeups() override {
+        // wake up immediately
+        engine::current_task::GetCurrentTaskContext().Wakeup(
+            engine::impl::TaskContext::WakeupSource::kDeadlineTimer, engine::impl::SleepState::Epoch{0}
+        );
+        return engine::impl::EarlyWakeup{false};
+    }
 
-  void DisableWakeups() override {
-    // simulate wait list notification before cleanup
-    engine::current_task::GetCurrentTaskContext().Wakeup(
-        engine::impl::TaskContext::WakeupSource::kWaitList,
-        engine::impl::TaskContext::NoEpoch{});
-  }
+    void DisableWakeups() noexcept override {
+        // simulate wait list notification before cleanup
+        engine::current_task::GetCurrentTaskContext().Wakeup(
+            engine::impl::TaskContext::WakeupSource::kWaitList, engine::impl::TaskContext::NoEpoch{}
+        );
+    }
 };
 
 constexpr size_t kWorkerThreads = 1;
@@ -52,47 +52,40 @@ constexpr size_t kWorkerThreads = 1;
 }  // namespace
 
 UTEST_MT(TaskContext, DetachedAndCancelledOnStart, kWorkerThreads) {
-  auto task = engine::AsyncNoSpan(
-      [checker = DtorInCoroChecker()] { FAIL() << "Cancelled task started"; });
-  task.RequestCancel();
-  std::move(task).Detach();
+    auto task = engine::AsyncNoSpan([checker = DtorInCoroChecker()] { FAIL() << "Cancelled task started"; });
+    task.RequestCancel();
+    std::move(task).Detach();
 }
 
-UTEST_MT(TaskContext, DetachedAndCancelledOnStartWithWrappedCall,
-         kWorkerThreads) {
-  auto task = engine::AsyncNoSpan(
-      [](auto&&) { FAIL() << "Cancelled task started"; }, DtorInCoroChecker());
-  task.RequestCancel();
-  std::move(task).Detach();
+UTEST_MT(TaskContext, DetachedAndCancelledOnStartWithWrappedCall, kWorkerThreads) {
+    auto task = engine::AsyncNoSpan([](auto&&) { FAIL() << "Cancelled task started"; }, DtorInCoroChecker());
+    task.RequestCancel();
+    std::move(task).Detach();
 }
 
 UTEST(TaskContext, WaitInterruptedReason) {
-  auto long_task = engine::AsyncNoSpan(
-      [] { engine::InterruptibleSleepFor(std::chrono::seconds{5}); });
-  auto waiter = engine::AsyncNoSpan([&] {
-    auto reason = engine::TaskCancellationReason::kNone;
-    try {
-      long_task.Get();
-    } catch (const engine::WaitInterruptedException& ex) {
-      reason = ex.Reason();
-    }
-    EXPECT_EQ(engine::TaskCancellationReason::kUserRequest, reason);
-  });
+    auto long_task = engine::AsyncNoSpan([] { engine::InterruptibleSleepFor(std::chrono::seconds{5}); });
+    auto waiter = engine::AsyncNoSpan([&] {
+        auto reason = engine::TaskCancellationReason::kNone;
+        try {
+            long_task.Get();
+        } catch (const engine::WaitInterruptedException& ex) {
+            reason = ex.Reason();
+        }
+        EXPECT_EQ(engine::TaskCancellationReason::kUserRequest, reason);
+    });
 
-  engine::Yield();
-  ASSERT_EQ(engine::Task::State::kSuspended, waiter.GetState());
-  waiter.RequestCancel();
-  waiter.Get();
+    engine::Yield();
+    ASSERT_EQ(engine::Task::State::kSuspended, waiter.GetState());
+    waiter.RequestCancel();
+    waiter.Get();
 }
 
 UTEST(TaskContext, WaitListWakeupRace) {
-  auto& context = engine::current_task::GetCurrentTaskContext();
+    auto& context = engine::current_task::GetCurrentTaskContext();
 
-  WaitListRaceSimulator wait_manager;
-  context.Sleep(wait_manager);
-
-  EXPECT_EQ(context.DebugGetWakeupSource(),
-            engine::impl::TaskContext::WakeupSource::kWaitList);
+    WaitListRaceSimulator wait_manager;
+    EXPECT_EQ(context.Sleep(wait_manager, engine::Deadline{}), engine::impl::TaskContext::WakeupSource::kWaitList);
 }
 
 USERVER_NAMESPACE_END

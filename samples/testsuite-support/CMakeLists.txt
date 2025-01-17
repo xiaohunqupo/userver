@@ -1,8 +1,11 @@
+cmake_minimum_required(VERSION 3.14)
 project(userver-samples-testsuite-support CXX)
+
+find_package(userver COMPONENTS core REQUIRED)
 
 file(GLOB_RECURSE SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
 add_executable(${PROJECT_NAME} ${SOURCES})
-target_link_libraries(${PROJECT_NAME} userver-core)
+target_link_libraries(${PROJECT_NAME} userver::core)
 
 # /// [testsuite - cmake]
 userver_testsuite_add(
@@ -12,7 +15,6 @@ userver_testsuite_add(
   PYTEST_ARGS
   --service-config=${CMAKE_CURRENT_SOURCE_DIR}/static_config.yaml
   --service-binary=${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}
-  --config-fallback=${CMAKE_CURRENT_SOURCE_DIR}/dynamic_config_fallback.json
   --service-config-vars=${CMAKE_CURRENT_SOURCE_DIR}/config_vars.yaml
 )
 # /// [testsuite - cmake]

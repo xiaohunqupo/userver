@@ -2,8 +2,7 @@
 
 ## Before you start
 
-Make sure that you can compile and run core tests and read a basic example @ref
-md_en_userver_tutorial_hello_service.
+Make sure that you can compile and run core tests and read a basic example @ref scripts/docs/en/userver/tutorial/hello_service.md.
 
 ## Step by step guide
 
@@ -22,7 +21,7 @@ database. The service would have the following Rest API:
 
 ### HTTP handler component
 
-Like in @ref md_en_userver_tutorial_hello_service we create a component for
+Like in @ref scripts/docs/en/userver/tutorial/hello_service.md we create a component for
 handling HTTP requests:
 
 @snippet samples/redis_service/redis_service.cpp Redis service sample - component
@@ -49,7 +48,7 @@ one of the member functions that actually implement the key-value storage logic:
 
 @warning `Handle*` functions are invoked concurrently on the same instance of
 the handler class. In this sample the KeyValue component only uses the thread
-safe DB client. In more complex cases @ref md_en_userver_synchronization "
+safe DB client. In more complex cases @ref scripts/docs/en/userver/synchronization.md "
 synchronization primitives" should be used or data must not be mutated.
 
 ### KeyValue::GetValue
@@ -77,25 +76,17 @@ Note that mutating queries are automatically executed on a master instance.
 
 ### Static config
 
-Static configuration of service is quite close to the configuration from @ref
-md_en_userver_tutorial_hello_service except for the handler and DB:
+Static configuration of service is quite close to the configuration from @ref scripts/docs/en/userver/tutorial/hello_service.md except for the handler and DB:
 
 @snippet samples/redis_service/static_config.yaml Redis service sample - static config
 
-### Dynamic config
+components::Redis takes database connection information from components::DefaultSecdistProvider, so it should be
+also configured:
 
-We are not planning to get new dynamic config values in this sample. Because of
-that we just write the defaults to the fallback file of
-the `components::DynamicConfigFallbacks` component:
-@ref samples/redis_service/dynamic_config_fallback.json
+@snippet samples/redis_service/static_config.yaml Sample secdist static config
 
-All the values are described in a separate section
-@ref md_en_schemas_dynamic_configs .
+The actual content of `secure_data.json` or `SECDIST_CONFIG` is described at components::Redis.
 
-A production ready service would dynamically retrieve the above options at
-runtime from a configuration service. See
-@ref md_en_userver_tutorial_config_service for insights on how to change the
-above options on the fly, without restarting the service.
 
 ### int main()
 
@@ -121,13 +112,12 @@ make userver-samples-redis_service
 
 The sample could be started by running
 `make start-userver-samples-redis_service`. The command would invoke
-@ref md_en_userver_functional_testing "testsuite start target" that sets proper
+@ref scripts/docs/en/userver/functional_testing.md "testsuite start target" that sets proper
 paths in the configuration files, prepares and starts the DB, and starts the
 service.
 
 To start the service manually start the DB server and run
-`./samples/redis_service/userver-samples-redis_service -c </path/to/static_config.yaml>`
-(do not forget to prepare the configuration files!).
+`./samples/redis_service/userver-samples-redis_service -c </path/to/static_config.yaml>`.
 
 Now you can send a request to
 your service from another terminal:
@@ -140,7 +130,7 @@ Date: Wed, 27 Oct 2021 16:45:13 UTC
 Content-Type: text/html
 X-YaSpanId: 015fb0becd2926ef
 X-YaRequestId: 7830671d7dd2462ba9043db532c2b82a
-Server: userver/1.0.0 (20211027123413; rv:c1879aa03)
+Server: userver/2.0 (20211027123413; rv:c1879aa03)
 X-YaTraceId: d7422d7bcdc9493997fc687f8be24883
 Connection: keep-alive
 Content-Length: 5
@@ -152,7 +142,7 @@ Date: Wed, 27 Oct 2021 16:46:35 UTC
 Content-Type: text/html
 X-YaSpanId: e83698e2ef8cc729
 X-YaRequestId: ffbaacae38e64bb588affa10b928b759
-Server: userver/1.0.0 (20211027123413; rv:c1879aa03)
+Server: userver/2.0 (20211027123413; rv:c1879aa03)
 X-YaTraceId: cd3e6acc299742739bb22c795b6ef3a7
 Connection: keep-alive
 Content-Length: 1
@@ -161,21 +151,31 @@ Content-Length: 1
 ```
 
 
+### Unit tests
+@ref scripts/docs/en/userver/testing.md "Unit tests" for the service could be
+implemented with one of UTEST macros in the following way:
+
+@snippet samples/redis_service/unittests/redis_test.cpp  Unit test
+
+
 ### Functional testing
-@ref md_en_userver_functional_testing "Functional tests" for the service could be
+@ref scripts/docs/en/userver/functional_testing.md "Functional tests" for the service could be
 implemented using the testsuite. To do that you have to:
 
-* Provide Redis settings info:
-@snippet samples/redis_service/tests/conftest.py service_env value
+* Prepare the pytest by importing the pytest_userver.plugins.redis plugin:
+  @snippet samples/redis_service/testsuite/conftest.py redis setup
 
-* Add the above values to the service environment variable:
-@snippet samples/redis_service/tests/conftest.py service_env
+* Add the Redis Secdist settings info to the service environment variable:
+  @snippet samples/redis_service/testsuite/conftest.py service_env
+  The @ref pytest_userver.plugins.service_client.auto_client_deps "auto_client_deps"
+  fixture already knows about the redis_store fixture, so there's no need to override
+  the @ref pytest_userver.plugins.service_client.extra_client_deps "extra_client_deps"
+  fixture.
 
-* Tell the testsuite to start the Redis database:
-@snippet samples/redis_service/tests/conftest.py client_deps
+  For details on Redis Secdist format, see @ref components::Redis.
 
 * Write the test:
-@snippet samples/redis_service/tests/test_redis.py  Functional test
+  @snippet samples/redis_service/testsuite/test_redis.py  Functional test
 
 
 ## Full sources
@@ -183,16 +183,19 @@ implemented using the testsuite. To do that you have to:
 See the full example:
 * @ref samples/redis_service/redis_service.cpp
 * @ref samples/redis_service/static_config.yaml
-* @ref samples/redis_service/dynamic_config_fallback.json
 * @ref samples/redis_service/CMakeLists.txt
+* @ref samples/redis_service/testsuite/conftest.pysamples/redis_service/CMakeLists.txt
+* @ref samples/redis_service/testsuite/conftest.py
+* @ref samples/redis_service/testsuite/test_redis.py
 
 ----------
 
 @htmlonly <div class="bottom-nav"> @endhtmlonly
-⇦ @ref md_en_userver_tutorial_mongo_service | @ref md_en_userver_component_system ⇨
+⇦ @ref scripts/docs/en/userver/tutorial/mongo_service.md | @ref scripts/docs/en/userver/tutorial/kafka_service.md ⇨
 @htmlonly </div> @endhtmlonly
 
 @example samples/redis_service/redis_service.cpp
 @example samples/redis_service/static_config.yaml
-@example samples/redis_service/dynamic_config_fallback.json
 @example samples/redis_service/CMakeLists.txt
+@example samples/redis_service/testsuite/conftest.py
+@example samples/redis_service/testsuite/test_redis.py

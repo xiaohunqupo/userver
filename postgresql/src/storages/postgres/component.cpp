@@ -12,7 +12,6 @@
 #include <userver/dynamic_config/storage/component.hpp>
 #include <userver/engine/task/task_processor_fwd.hpp>
 #include <userver/error_injection/settings.hpp>
-#include <userver/formats/json/value_builder.hpp>
 #include <userver/logging/log.hpp>
 #include <userver/storages/postgres/cluster.hpp>
 #include <userver/storages/postgres/cluster_types.hpp>
@@ -22,9 +21,9 @@
 #include <userver/storages/secdist/component.hpp>
 #include <userver/storages/secdist/exceptions.hpp>
 #include <userver/testsuite/postgres_control.hpp>
+#include <userver/testsuite/tasks.hpp>
 #include <userver/testsuite/testsuite_support.hpp>
-#include <userver/utils/statistics/metadata.hpp>
-#include <userver/utils/statistics/percentile_format_json.hpp>
+#include <userver/utils/enumerate.hpp>
 #include <userver/yaml_config/merge_schemas.hpp>
 
 USERVER_NAMESPACE_BEGIN
@@ -34,291 +33,179 @@ namespace {
 
 constexpr auto kStatisticsName = "postgresql";
 
-formats::json::ValueBuilder InstanceStatisticsToJson(
-    const storages::postgres::InstanceStatisticsNonatomic& stats) {
-  formats::json::ValueBuilder instance(formats::json::Type::kObject);
+storages::postgres::ConnlimitMode ParseConnlimitMode(const std::string& value) {
+    if (value == "manual") return storages::postgres::ConnlimitMode::kManual;
+    if (value == "auto") return storages::postgres::ConnlimitMode::kAuto;
 
-  auto conn = instance["connections"];
-  conn["opened"] = stats.connection.open_total;
-  conn["closed"] = stats.connection.drop_total;
-  conn["active"] = stats.connection.active;
-  conn["busy"] = stats.connection.used;
-  conn["max"] = stats.connection.maximum;
-  conn["waiting"] = stats.connection.waiting;
-  conn["max-queue-size"] = stats.connection.max_queue_size;
-
-  auto trx = instance["transactions"];
-  trx["total"] = stats.transaction.total;
-  trx["committed"] = stats.transaction.commit_total;
-  trx["rolled-back"] = stats.transaction.rollback_total;
-  trx["no-tran"] = stats.transaction.out_of_trx_total;
-
-  auto timing = trx["timings"];
-  timing["full"]["1min"] =
-      utils::statistics::PercentileToJson(stats.transaction.total_percentile);
-  utils::statistics::SolomonSkip(timing["full"]["1min"]);
-  timing["busy"]["1min"] =
-      utils::statistics::PercentileToJson(stats.transaction.busy_percentile);
-  utils::statistics::SolomonSkip(timing["busy"]["1min"]);
-  timing["wait-start"]["1min"] = utils::statistics::PercentileToJson(
-      stats.transaction.wait_start_percentile);
-  utils::statistics::SolomonSkip(timing["wait-start"]["1min"]);
-  timing["wait-end"]["1min"] = utils::statistics::PercentileToJson(
-      stats.transaction.wait_end_percentile);
-  utils::statistics::SolomonSkip(timing["wait-end"]["1min"]);
-  timing["return-to-pool"]["1min"] = utils::statistics::PercentileToJson(
-      stats.transaction.return_to_pool_percentile);
-  utils::statistics::SolomonSkip(timing["return-to-pool"]["1min"]);
-  timing["connect"]["1min"] =
-      utils::statistics::PercentileToJson(stats.connection_percentile);
-  utils::statistics::SolomonSkip(timing["connect"]["1min"]);
-  timing["acquire-connection"]["1min"] =
-      utils::statistics::PercentileToJson(stats.acquire_percentile);
-  utils::statistics::SolomonSkip(timing["acquire-connection"]["1min"]);
-
-  auto query = instance["queries"];
-  query["parsed"] = stats.transaction.parse_total;
-  query["portals-bound"] = stats.transaction.portal_bind_total;
-  query["executed"] = stats.transaction.execute_total;
-  query["replies"] = stats.transaction.reply_total;
-
-  auto errors = instance["errors"];
-  utils::statistics::SolomonChildrenAreLabelValues(errors, "postgresql_error");
-  errors["query-exec"] = stats.transaction.error_execute_total;
-  errors["query-timeout"] = stats.transaction.execute_timeout;
-  errors["duplicate-prepared-statement"] =
-      stats.transaction.duplicate_prepared_statements;
-  errors["connection"] = stats.connection.error_total;
-  errors["pool"] = stats.pool_exhaust_errors;
-  errors["queue"] = stats.queue_size_errors;
-  errors["connection-timeout"] = stats.connection.error_timeout;
-
-  instance["prepared-per-connection"] = stats.connection.prepared_statements;
-  instance["roundtrip-time"] = stats.topology.roundtrip_time;
-  instance["replication-lag"] = stats.topology.replication_lag;
-
-  if (!stats.statement_timings.empty()) {
-    auto timings = instance["statement_timings"];
-    utils::statistics::SolomonChildrenAreLabelValues(timings,
-                                                     "postgresql_query");
-    for (const auto& [name, percentile] : stats.statement_timings) {
-      timings[name] = utils::statistics::PercentileToJson(percentile);
-    }
-  }
-
-  utils::statistics::SolomonLabelValue(instance, "postgresql_instance");
-  return instance;
-}
-
-void AddInstanceStatistics(
-    const storages::postgres::InstanceStatsDescriptor& desc,
-    formats::json::ValueBuilder& parent) {
-  if (!desc.host_port.empty()) {
-    parent[desc.host_port] = InstanceStatisticsToJson(desc.stats);
-  }
-}
-
-formats::json::ValueBuilder ClusterStatisticsToJson(
-    storages::postgres::ClusterStatisticsPtr stats) {
-  formats::json::ValueBuilder cluster(formats::json::Type::kObject);
-  utils::statistics::SolomonChildrenAreLabelValues(
-      cluster, "postgresql_cluster_host_type");
-  auto master = cluster["master"];
-  master = {formats::json::Type::kObject};
-  AddInstanceStatistics(stats->master, master);
-  auto sync_slave = cluster["sync_slave"];
-  sync_slave = {formats::json::Type::kObject};
-  AddInstanceStatistics(stats->sync_slave, sync_slave);
-  auto slaves = cluster["slaves"];
-  slaves = {formats::json::Type::kObject};
-  for (const auto& slave : stats->slaves) {
-    AddInstanceStatistics(slave, slaves);
-  }
-  auto unknown = cluster["unknown"];
-  unknown = {formats::json::Type::kObject};
-  for (const auto& uho : stats->unknown) {
-    AddInstanceStatistics(uho, unknown);
-  }
-  return cluster;
-}
-
-formats::json::ValueBuilder PostgresStatisticsToJson(
-    const std::vector<storages::postgres::Cluster*>& shards) {
-  formats::json::ValueBuilder result(formats::json::Type::kObject);
-  for (size_t i = 0; i < shards.size(); ++i) {
-    auto* cluster = shards[i];
-    if (cluster) {
-      const auto shard_name = "shard_" + std::to_string(i);
-      result[shard_name] = ClusterStatisticsToJson(cluster->GetStatistics());
-    }
-  }
-  utils::statistics::SolomonChildrenAreLabelValues(result,
-                                                   "postgresql_database_shard");
-  return result;
+    UINVARIANT(false, "Unknown connlimit mode: " + value);
 }
 
 }  // namespace
 
-Postgres::Postgres(const ComponentConfig& config,
-                   const ComponentContext& context)
-    : LoggableComponentBase(config, context),
+Postgres::Postgres(const ComponentConfig& config, const ComponentContext& context)
+    : ComponentBase(config, context),
       name_{config.Name()},
-      database_{std::make_shared<storages::postgres::Database>()} {
-  storages::postgres::LogRegisteredTypesOnce();
+      database_{std::make_shared<storages::postgres::Database>()},
+      config_source_{context.FindComponent<DynamicConfig>().GetSource()} {
+    storages::postgres::LogRegisteredTypesOnce();
 
-  namespace pg = storages::postgres;
+    namespace pg = storages::postgres;
 
-  auto config_source = context.FindComponent<DynamicConfig>().GetSource();
-  const auto initial_config = config_source.GetSnapshot();
-  const auto& pg_config = initial_config.Get<storages::postgres::Config>();
+    const auto initial_config = config_source_.GetSnapshot();
+    const auto& pg_config = initial_config[storages::postgres::kConfig];
 
-  const auto dbalias = config["dbalias"].As<std::string>("");
+    const auto dbalias = config["dbalias"].As<std::string>("");
 
-  std::vector<pg::DsnList> cluster_desc;
-  if (dbalias.empty()) {
-    const pg::Dsn dsn{config["dbconnection"].As<std::string>()};
-    const auto options = pg::OptionsFromDsn(dsn);
-    db_name_ = options.dbname;
-    cluster_desc.push_back(pg::SplitByHost(dsn));
-  } else {
-    try {
-      auto& secdist = context.FindComponent<Secdist>();
-      cluster_desc = secdist.Get()
-                         .Get<pg::secdist::PostgresSettings>()
-                         .GetShardedClusterDescription(dbalias);
-      db_name_ = dbalias;
-    } catch (const storages::secdist::SecdistError& ex) {
-      LOG_ERROR() << "Failed to load Postgres config for dbalias " << dbalias
-                  << ": " << ex;
-      throw;
+    std::vector<pg::DsnList> cluster_desc;
+    if (dbalias.empty()) {
+        const pg::Dsn dsn{config["dbconnection"].As<std::string>()};
+        const auto options = pg::OptionsFromDsn(dsn);
+        db_name_ = options.dbname;
+        cluster_desc.push_back(pg::SplitByHost(dsn));
+    } else {
+        try {
+            auto& secdist = context.FindComponent<Secdist>();
+            cluster_desc = secdist.Get().Get<pg::secdist::PostgresSettings>().GetShardedClusterDescription(dbalias);
+            db_name_ = dbalias;
+            dbalias_ = dbalias;
+        } catch (const storages::secdist::SecdistError& ex) {
+            LOG_ERROR() << "Failed to load Postgres config for dbalias " << dbalias << ": " << ex;
+            throw;
+        }
     }
-  }
 
-  const auto monitoring_dbalias =
-      config["monitoring-dbalias"].As<std::string>("");
-  if (!monitoring_dbalias.empty()) {
-    db_name_ = monitoring_dbalias;
-  }
+    const auto monitoring_dbalias = config["monitoring-dbalias"].As<std::string>("");
+    if (!monitoring_dbalias.empty()) {
+        db_name_ = monitoring_dbalias;
+    }
 
-  storages::postgres::ClusterSettings cluster_settings;
-  cluster_settings.statement_metrics_settings =
-      config.As<storages::postgres::StatementMetricsSettings>();
+    initial_settings_.init_mode = config["sync-start"].As<bool>(true) ? storages::postgres::InitMode::kSync
+                                                                      : storages::postgres::InitMode::kAsync;
+    initial_settings_.db_name = db_name_;
+    initial_settings_.connlimit_mode = ParseConnlimitMode(config["connlimit_mode"].As<std::string>("auto"));
 
-  cluster_settings.pool_settings =
-      config.As<storages::postgres::PoolSettings>();
-  cluster_settings.init_mode = config["sync-start"].As<bool>(true)
-                                   ? storages::postgres::InitMode::kSync
-                                   : storages::postgres::InitMode::kAsync;
-  cluster_settings.db_name = db_name_;
+    initial_settings_.topology_settings.max_replication_lag =
+        config["max_replication_lag"].As<std::chrono::milliseconds>(storages::postgres::kDefaultMaxReplicationLag);
 
-  storages::postgres::TopologySettings& topology_settings =
-      cluster_settings.topology_settings;
-  topology_settings.max_replication_lag =
-      config["max_replication_lag"].As<std::chrono::milliseconds>(
-          kDefaultMaxReplicationLag);
+    initial_settings_.pool_settings =
+        pg_config.pool_settings.GetOptional(name_).value_or(config.As<storages::postgres::PoolSettings>());
+    initial_settings_.conn_settings =
+        pg_config.connection_settings.GetOptional(name_).value_or(config.As<storages::postgres::ConnectionSettings>());
+    initial_settings_.conn_settings.pipeline_mode = initial_config[storages::postgres::kPipelineModeKey];
+    initial_settings_.conn_settings.omit_describe_mode =
+        initial_config[storages::postgres::kOmitDescribeInExecuteModeKey];
+    initial_settings_.statement_metrics_settings = pg_config.statement_metrics_settings.GetOptional(name_).value_or(
+        config.As<storages::postgres::StatementMetricsSettings>()
+    );
 
-  cluster_settings.conn_settings =
-      config.As<storages::postgres::ConnectionSettings>();
+    const auto task_processor_name = config["blocking_task_processor"].As<std::string>();
+    auto* bg_task_processor = &context.GetTaskProcessor(task_processor_name);
 
-  const auto task_processor_name =
-      config["blocking_task_processor"].As<std::string>();
-  auto* bg_task_processor = &context.GetTaskProcessor(task_processor_name);
+    error_injection::Settings ei_settings;
+    auto ei_settings_opt = config["error-injection"].As<std::optional<error_injection::Settings>>();
+    if (ei_settings_opt) ei_settings = *ei_settings_opt;
 
-  error_injection::Settings ei_settings;
-  auto ei_settings_opt =
-      config["error-injection"].As<std::optional<error_injection::Settings>>();
-  if (ei_settings_opt) ei_settings = *ei_settings_opt;
+    auto& statistics_storage = context.FindComponent<components::StatisticsStorage>().GetStorage();
+    statistics_holder_ = statistics_storage.RegisterWriter(kStatisticsName, [this](utils::statistics::Writer& writer) {
+        return ExtendStatistics(writer);
+    });
 
-  auto& statistics_storage =
-      context.FindComponent<components::StatisticsStorage>().GetStorage();
-  statistics_holder_ = statistics_storage.RegisterExtender(
-      kStatisticsName,
-      [this](const utils::statistics::StatisticsRequest& request) {
-        return ExtendStatistics(request);
-      });
+    // Start all clusters here
+    LOG_DEBUG() << "Start " << cluster_desc.size() << " shards for " << db_name_;
 
-  // Start all clusters here
-  LOG_DEBUG() << "Start " << cluster_desc.size() << " shards for " << db_name_;
+    const auto& testsuite_pg_ctl = context.FindComponent<components::TestsuiteSupport>().GetPostgresControl();
+    auto& testsuite_tasks = testsuite::GetTestsuiteTasks(context);
 
-  const auto& testsuite_pg_ctl =
-      context.FindComponent<components::TestsuiteSupport>()
-          .GetPostgresControl();
+    auto* resolver = clients::dns::GetResolverPtr(config, context);
 
-  auto* resolver = clients::dns::GetResolverPtr(config, context);
+    int shard_number = 0;
+    for (auto& dsns : cluster_desc) {
+        auto cluster = std::make_shared<pg::Cluster>(
+            std::move(dsns),
+            resolver,
+            *bg_task_processor,
+            initial_settings_,
+            storages::postgres::DefaultCommandControls{
+                pg_config.default_command_control,
+                pg_config.handlers_command_control,
+                pg_config.queries_command_control},
+            testsuite_pg_ctl,
+            ei_settings,
+            testsuite_tasks,
+            config_source_,
+            shard_number++
+        );
+        database_->clusters_.push_back(cluster);
+    }
 
-  for (auto& dsns : cluster_desc) {
-    auto cluster = std::make_shared<pg::Cluster>(
-        std::move(dsns), resolver, *bg_task_processor, cluster_settings,
-        storages::postgres::DefaultCommandControls{
-            pg_config.default_command_control,
-            pg_config.handlers_command_control,
-            pg_config.queries_command_control},
-        testsuite_pg_ctl, ei_settings);
-    database_->clusters_.push_back(cluster);
-  }
+    config_subscription_ = config_source_.UpdateAndListen(this, "postgres", &Postgres::OnConfigUpdate);
+    if (!dbalias_.empty()) {
+        auto& secdist = context.FindComponent<Secdist>();
+        secdist_subscription_ = secdist.GetStorage().UpdateAndListen(this, db_name_, &Postgres::OnSecdistUpdate);
+    }
 
-  config_subscription_ = config_source.UpdateAndListen(
-      this, "postgres", &Postgres::OnConfigUpdate);
-
-  LOG_DEBUG() << "Component ready";
+    LOG_DEBUG() << "Component ready";
 }
 
 Postgres::~Postgres() {
-  statistics_holder_.Unregister();
-  config_subscription_.Unsubscribe();
+    statistics_holder_.Unregister();
+    config_subscription_.Unsubscribe();
 }
 
-storages::postgres::ClusterPtr Postgres::GetCluster() const {
-  return database_->GetCluster();
-}
+storages::postgres::ClusterPtr Postgres::GetCluster() const { return database_->GetCluster(); }
 
-storages::postgres::ClusterPtr Postgres::GetClusterForShard(
-    size_t shard) const {
-  return database_->GetClusterForShard(shard);
+storages::postgres::ClusterPtr Postgres::GetClusterForShard(size_t shard) const {
+    return database_->GetClusterForShard(shard);
 }
 
 size_t Postgres::GetShardCount() const { return database_->GetShardCount(); }
 
-formats::json::Value Postgres::ExtendStatistics(
-    const utils::statistics::StatisticsRequest& /*request*/) {
-  std::vector<storages::postgres::Cluster*> shards_ready;
-  shards_ready.reserve(GetShardCount());
-  std::transform(database_->clusters_.begin(), database_->clusters_.end(),
-                 std::back_inserter(shards_ready),
-                 [](const auto& sh) { return sh.get(); });
-
-  formats::json::ValueBuilder result(formats::json::Type::kObject);
-  result[db_name_] = PostgresStatisticsToJson(shards_ready);
-  utils::statistics::SolomonLabelValue(result[db_name_], "postgresql_database");
-  return result.ExtractValue();
+void Postgres::ExtendStatistics(utils::statistics::Writer& writer) {
+    for (const auto& [i, cluster] : utils::enumerate(database_->clusters_)) {
+        if (cluster) {
+            const auto shard_name = "shard_" + std::to_string(i);
+            writer.ValueWithLabels(
+                *cluster->GetStatistics(),
+                {{"postgresql_database", db_name_}, {"postgresql_database_shard", shard_name}}
+            );
+        }
+    }
 }
 
 void Postgres::OnConfigUpdate(const dynamic_config::Snapshot& cfg) {
-  const auto& pg_config = cfg.Get<storages::postgres::Config>();
-  const auto pool_settings = pg_config.pool_settings.GetOptional(name_);
-  auto connection_settings = pg_config.connection_settings.GetOptional(name_);
-  const auto statement_metrics_settings =
-      pg_config.statement_metrics_settings.GetOptional(name_);
-  const auto pipeline_mode = cfg[storages::postgres::kPipelineModeKey];
-  for (const auto& cluster : database_->clusters_) {
-    cluster->ApplyGlobalCommandControlUpdate(pg_config.default_command_control);
-    cluster->SetHandlersCommandControl(pg_config.handlers_command_control);
-    cluster->SetQueriesCommandControl(pg_config.queries_command_control);
-    if (pool_settings) cluster->SetPoolSettings(*pool_settings);
-    if (connection_settings) {
-      connection_settings->pipeline_mode = pipeline_mode;
-      cluster->SetConnectionSettings(*connection_settings);
-    } else {
-      cluster->SetPipelineMode(pipeline_mode);
+    const auto& pg_config = cfg[storages::postgres::kConfig];
+    const auto pool_settings = pg_config.pool_settings.GetOptional(name_).value_or(initial_settings_.pool_settings);
+    const auto topology_settings =
+        pg_config.topology_settings.GetOptional(name_).value_or(initial_settings_.topology_settings);
+    auto connection_settings =
+        pg_config.connection_settings.GetOptional(name_).value_or(initial_settings_.conn_settings);
+    connection_settings.pipeline_mode = cfg[storages::postgres::kPipelineModeKey];
+    connection_settings.omit_describe_mode = cfg[storages::postgres::kOmitDescribeInExecuteModeKey];
+    const auto statement_metrics_settings =
+        pg_config.statement_metrics_settings.GetOptional(name_).value_or(initial_settings_.statement_metrics_settings);
+
+    for (const auto& cluster : database_->clusters_) {
+        cluster->ApplyGlobalCommandControlUpdate(pg_config.default_command_control);
+        cluster->SetHandlersCommandControl(pg_config.handlers_command_control);
+        cluster->SetQueriesCommandControl(pg_config.queries_command_control);
+        cluster->SetPoolSettings(pool_settings);
+        cluster->SetTopologySettings(topology_settings);
+        cluster->SetConnectionSettings(connection_settings);
+        cluster->SetStatementMetricsSettings(statement_metrics_settings);
     }
-    if (statement_metrics_settings) {
-      cluster->SetStatementMetricsSettings(*statement_metrics_settings);
-    }
-  }
+}
+
+void Postgres::OnSecdistUpdate(const storages::secdist::SecdistConfig& secdist) {
+    const auto& cluster_desc =
+        secdist.Get<storages::postgres::secdist::PostgresSettings>().GetShardedClusterDescription(dbalias_);
+    database_->UpdateClusterDescription(cluster_desc);
+
+    auto snapshot = config_source_.GetSnapshot();
+    OnConfigUpdate(snapshot);
 }
 
 yaml_config::Schema Postgres::GetStaticConfigSchema() {
-  return yaml_config::MergeSchemas<LoggableComponentBase>(R"(
+    return yaml_config::MergeSchemas<ComponentBase>(R"(
 type: object
 description: PosgreSQL client component
 additionalProperties: false
@@ -351,7 +238,7 @@ properties:
     dns_resolver:
         type: string
         description: server hostname resolver type (getaddrinfo or async)
-        defaultDescription: 'getaddrinfo'
+        defaultDescription: 'async'
         enum:
           - getaddrinfo
           - async
@@ -363,10 +250,24 @@ properties:
         type: boolean
         description: disabling will disallow use of user-defined types
         defaultDescription: true
+    check-user-types:
+        type: boolean
+        description: |
+            cancel service start if some user types have not been loaded, which
+            helps to detect missing migrations
+        defaultDescription: false
     ignore_unused_query_params:
         type: boolean
         description: disable check for not-NULL query params that are not used in query
         defaultDescription: false
+    max-ttl-sec:
+        type: integer
+        minimum: 1
+        description: the maximum lifetime for connections
+    discard-all-on-connect:
+        type: boolean
+        description: execute discard all on new connections
+        defaultDescription: true
     monitoring-dbalias:
         type: string
         description: name of the database for monitorings
@@ -389,7 +290,7 @@ properties:
                 description: enable error injection
                 defaultDescription: false
             probability:
-                type: double
+                type: number
                 description: thrown exception probability
                 defaultDescription: 0
             verdicts:
@@ -404,14 +305,6 @@ properties:
                       - error
                       - max-delay
                       - random-delay
-    min_pool_size:
-        type: integer
-        description: number of connections created initially
-        defaultDescription: 4
-    max_pool_size:
-        type: integer
-        description: maximum number of created connections
-        defaultDescription: 15
     max_queue_size:
         type: integer
         description: maximum number of clients waiting for a connection
@@ -424,6 +317,12 @@ properties:
         type: integer
         description: limit for concurrent establishing connections number per pool (0 - unlimited)
         defaultDescription: 0
+    connlimit_mode:
+        type: string
+        enum:
+         - auto
+         - manual
+        description: how to learn the `max_pool_size`
 )");
 }
 

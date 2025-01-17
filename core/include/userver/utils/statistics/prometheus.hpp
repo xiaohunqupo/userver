@@ -1,10 +1,9 @@
 #pragma once
 
 /// @file userver/utils/statistics/prometheus.hpp
-/// @brief @copybrief utils::statistics::ToPrometheusFormat
+/// @brief Statistics output in Prometheus format.
 
 #include <string>
-#include <unordered_map>
 
 #include <userver/utils/statistics/storage.hpp>
 
@@ -27,11 +26,13 @@ std::string ToPrometheusLabel(std::string_view name);
 
 }  // namespace impl
 
-/// Output `statistics` in Prometheus format
-std::string ToPrometheusFormat(
-    const std::unordered_map<std::string, std::string>& common_labels,
-    const utils::statistics::Storage& statistics,
-    const utils::statistics::StatisticsRequest& statistics_request = {});
+/// Output `statistics` in Prometheus format, each metric has `gauge` type.
+std::string
+ToPrometheusFormat(const utils::statistics::Storage& statistics, const utils::statistics::Request& request = {});
+
+/// Output `statistics` in Prometheus format, without metric types.
+std::string
+ToPrometheusFormatUntyped(const utils::statistics::Storage& statistics, const utils::statistics::Request& request = {});
 
 }  // namespace utils::statistics
 

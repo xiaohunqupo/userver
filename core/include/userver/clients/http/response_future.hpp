@@ -7,6 +7,7 @@
 #include <memory>
 #include <type_traits>
 
+#include <userver/clients/http/config.hpp>
 #include <userver/clients/http/response.hpp>
 #include <userver/compiler/select.hpp>
 #include <userver/engine/deadline.hpp>
@@ -26,34 +27,38 @@ class EasyWrapper;
 /// @brief Allows to perform a request concurrently with other work without
 /// creating an extra coroutine for waiting.
 class ResponseFuture final {
- public:
-  ResponseFuture(ResponseFuture&& other) noexcept;
-  ResponseFuture& operator=(ResponseFuture&&) noexcept;
-  ResponseFuture(const ResponseFuture&) = delete;
-  ResponseFuture& operator=(const ResponseFuture&) = delete;
-  ~ResponseFuture();
+public:
+    ResponseFuture(ResponseFuture&& other) noexcept;
+    ResponseFuture& operator=(ResponseFuture&&) noexcept;
+    ResponseFuture(const ResponseFuture&) = delete;
+    ResponseFuture& operator=(const ResponseFuture&) = delete;
+    ~ResponseFuture();
 
-  void Cancel();
+    void Cancel();
 
-  void Detach();
+    void Detach();
 
-  std::future_status Wait();
+    std::future_status Wait();
 
-  std::shared_ptr<Response> Get();
+    std::shared_ptr<Response> Get();
 
-  /// @cond
-  /// Internal helper for WaitAny/WaitAll
-  engine::impl::ContextAccessor* TryGetContextAccessor() noexcept;
+    void SetCancellationPolicy(CancellationPolicy cp);
 
-  ResponseFuture(engine::Future<std::shared_ptr<Response>>&& future,
-                 std::chrono::milliseconds total_timeout,
-                 std::shared_ptr<RequestState> request);
-  /// @endcond
+    /// @cond
+    /// Internal helper for WaitAny/WaitAll
+    engine::impl::ContextAccessor* TryGetContextAccessor() noexcept;
 
- private:
-  engine::Future<std::shared_ptr<Response>> future_;
-  engine::Deadline deadline_;
-  std::shared_ptr<RequestState> request_state_;
+    ResponseFuture(engine::Future<std::shared_ptr<Response>>&& future, std::shared_ptr<RequestState> request);
+    /// @endcond
+
+private:
+    void CancelOrDetach();
+
+    engine::Future<std::shared_ptr<Response>> future_;
+    engine::Deadline deadline_;
+    std::shared_ptr<RequestState> request_state_;
+    bool was_deadline_propagated_{false};
+    CancellationPolicy cancellation_policy_;
 };
 
 }  // namespace clients::http

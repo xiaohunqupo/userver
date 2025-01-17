@@ -10,6 +10,12 @@ src:*bits/stl_iterator.h
 [undefined]
 src:*bits/stl_vector.h
 
+# TODO: fix the issues in TAXICOMMON-8084 and remove the following tsan related lines: 
+[thread]
+mainfile:*core/src/engine/task/task_context.cpp
+mainfile:*core/src/engine/task/task_context.hpp
+src:*third_party/moodycamel/include/moodycamel/concurrentqueue.h
+
 # libstdc++ 8.0.1 casts an under-aligned pointer to type type_info:
 # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=85930
 [undefined]
@@ -20,3 +26,7 @@ src:*bits/shared_ptr_base.h
 src:*boost/lockfree/*
 # https://st.yandex-team.ru/TAXICOMMON-2436
 src:*boost/circular_buffer/base.hpp
+
+# grpc doesn't work with ubuntu packages
+[undefined]
+src:*grpcpp/impl/codegen/client_context_impl.h

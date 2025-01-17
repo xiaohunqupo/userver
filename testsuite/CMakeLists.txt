@@ -1,1 +1,3 @@
-configure_file(env.in env @ONLY)
+if (USERVER_BUILD_TESTS)
+    add_subdirectory(tests)
+endif()

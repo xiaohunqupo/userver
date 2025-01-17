@@ -8,7 +8,7 @@
 |--|-----------------------------|
 | **OS** | Ubuntu, Debian, Fedora, Arch, Gentoo, macOS |
 | **Architectures** | x86, x86_64, AArch64, Arm |
-| **Compilers** | GCC-8 and newer, Clang-9 and newer |
+| **Compilers** | GCC-8 and newer, Clang-10 and newer |
 | **C++ Standards** | C++17, C++20, C++23 |
 | **C++ Standard Libraries** | libstdc++, libc++ |
 
@@ -30,6 +30,12 @@ organization page contains multiple repositories, including:
 * [service_template](https://github.com/userver-framework/service_template) -
   template of a C++ service that uses userver framework with ready-to-user
   build, test and CI scripts. 
+* [pg_service_template](https://github.com/userver-framework/pg_service_template) -
+  template of a C++ service that uses userver framework with ready-to-user PostgreSQL database,
+  build, test and CI scripts. 
+* [pg_grpc_service_template](https://github.com/userver-framework/pg_grpc_service_template) -
+  template of a C++ service that uses userver framework with ready-to-user PostgreSQL database, gRPC server,
+  build, test and CI scripts. 
 * [uservice-dynconf](https://github.com/userver-framework/uservice-dynconf) -
   the service to control dynamic configs of the other userver-based services.
 
@@ -45,5 +51,5 @@ Telegram channels.
 ----------
 
 @htmlonly <div class="bottom-nav"> @endhtmlonly
-⇦ @ref md_en_userver_framework_comparison | @ref md_en_userver_tutorial_build ⇨
+⇦ @ref scripts/docs/en/userver/framework_comparison.md | @ref scripts/docs/en/userver/build/build.md ⇨
 @htmlonly </div> @endhtmlonly

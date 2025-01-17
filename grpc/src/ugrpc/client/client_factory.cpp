@@ -1,109 +1,48 @@
 #include <userver/ugrpc/client/client_factory.hpp>
 
-#include <optional>
-#include <stdexcept>
-
-#include <fmt/format.h>
-
-#include <userver/engine/async.hpp>
-#include <userver/logging/level_serialization.hpp>
-#include <userver/yaml_config/yaml_config.hpp>
-
-#include <ugrpc/impl/logging.hpp>
-#include <ugrpc/impl/to_string.hpp>
+#include <ugrpc/impl/grpc_native_logging.hpp>
 
 USERVER_NAMESPACE_BEGIN
 
 namespace ugrpc::client {
 
-namespace {
-
-grpc::ChannelArguments MakeChannelArgs(
-    const yaml_config::YamlConfig& channel_args,
-    const yaml_config::YamlConfig& default_service_config) {
-  grpc::ChannelArguments args;
-  if (!channel_args.IsMissing()) {
-    for (const auto& [key, value] : Items(channel_args)) {
-      if (value.IsInt64()) {
-        args.SetInt(ugrpc::impl::ToGrpcString(key), value.As<int>());
-      } else {
-        args.SetString(ugrpc::impl::ToGrpcString(key), value.As<std::string>());
-      }
-    }
-  }
-
-  if (!default_service_config.IsMissing()) {
-    args.SetServiceConfigJSON(default_service_config.As<std::string>());
-  }
-  return args;
+ClientFactory::ClientFactory(
+    ClientFactorySettings&& settings,
+    engine::TaskProcessor& channel_task_processor,
+    MiddlewareFactories mws,
+    ugrpc::impl::CompletionQueuePoolBase& completion_queues,
+    ugrpc::impl::StatisticsStorage& statistics_storage,
+    testsuite::GrpcControl& testsuite_grpc,
+    dynamic_config::Source source
+)
+    : settings_(std::move(settings)),
+      channel_task_processor_(channel_task_processor),
+      mws_(mws),
+      completion_queues_(completion_queues),
+      client_statistics_storage_(statistics_storage),
+      config_source_(source),
+      testsuite_grpc_(testsuite_grpc) {
+    ugrpc::impl::SetupNativeLogging();
+    ugrpc::impl::UpdateNativeLogLevel(settings_.native_log_level);
 }
 
-enum class AuthType {
-  kInsecure,
-  kSsl,
-};
+impl::ClientDependencies ClientFactory::MakeClientDependencies(ClientSettings&& settings) {
+    UINVARIANT(!settings.client_name.empty(), "Client name is empty");
+    UINVARIANT(!settings.endpoint.empty(), "Client endpoint is empty");
 
-AuthType Parse(const yaml_config::YamlConfig& value,
-               formats::parse::To<AuthType>) {
-  const auto string = value.As<std::string>();
-
-  if (string == "insecure") return AuthType::kInsecure;
-  if (string == "ssl") return AuthType::kSsl;
-
-  throw std::runtime_error(
-      fmt::format("Failed to parse AuthType from '{}' at path '{}'", string,
-                  value.GetPath()));
-}
-
-std::shared_ptr<grpc::ChannelCredentials> MakeDefaultCredentials(
-    AuthType type) {
-  switch (type) {
-    case AuthType::kInsecure:
-      return grpc::InsecureChannelCredentials();
-    case AuthType::kSsl:
-      return grpc::SslCredentials({});
-  }
-  UINVARIANT(false, "Invalid AuthType");
-}
-
-}  // namespace
-
-ClientFactoryConfig Parse(const yaml_config::YamlConfig& value,
-                          formats::parse::To<ClientFactoryConfig>) {
-  ClientFactoryConfig config;
-  config.credentials = MakeDefaultCredentials(
-      value["auth-type"].As<AuthType>(AuthType::kInsecure));
-
-  config.channel_args =
-      MakeChannelArgs(value["channel-args"], value["default-service-config"]);
-  config.native_log_level =
-      value["native-log-level"].As<logging::Level>(config.native_log_level);
-  config.channel_count =
-      value["channel-count"].As<std::size_t>(config.channel_count);
-
-  return config;
-}
-
-ClientFactory::ClientFactory(ClientFactoryConfig&& config,
-                             engine::TaskProcessor& channel_task_processor,
-                             grpc::CompletionQueue& queue,
-                             utils::statistics::Storage& statistics_storage)
-    : channel_task_processor_(channel_task_processor),
-      queue_(queue),
-      channel_cache_(std::move(config.credentials), config.channel_args,
-                     config.channel_count),
-      client_statistics_storage_(statistics_storage, "client") {
-  ugrpc::impl::SetupNativeLogging();
-  ugrpc::impl::UpdateNativeLogLevel(config.native_log_level);
-}
-
-impl::ChannelCache::Token ClientFactory::GetChannel(
-    const std::string& endpoint) {
-  // Spawn a blocking task creating a gRPC channel
-  // This is third party code, no use of span inside it
-  return engine::AsyncNoSpan(channel_task_processor_,
-                             [&] { return channel_cache_.Get(endpoint); })
-      .Get();
+    return impl::ClientDependencies{
+        settings.client_name,
+        settings.endpoint,
+        impl::InstantiateMiddlewares(mws_, settings.client_name),
+        completion_queues_,
+        client_statistics_storage_,
+        config_source_,
+        testsuite_grpc_,
+        settings.client_qos,
+        settings_,
+        channel_task_processor_,
+        std::move(settings.dedicated_methods_config),
+    };
 }
 
 }  // namespace ugrpc::client

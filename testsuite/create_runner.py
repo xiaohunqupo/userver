@@ -4,6 +4,7 @@ import pprint
 import sys
 
 TEMPLATE = """#!{python}
+import os
 import sys
 
 import pytest
@@ -14,10 +15,13 @@ TESTSUITE_PYTEST_ARGS = {pytest_args}
 
 def testsuite_runner():
     args = [
+        # Put path to test sources as the first argument to work around pytest issue #12802
+        sys.argv[-1],
         *TESTSUITE_PYTEST_ARGS,
-        *sys.argv[1:],
+        *sys.argv[1:-1],
     ]
     sys.path.extend(TESTSUITE_PYTHONPATH)
+    os.environ['PATH'] = os.path.dirname('{python}') + ':' + os.environ['PATH']
     return pytest.main(args=args)
 
 
@@ -52,7 +56,9 @@ def main():
         help='Semicolon separated Python path',
     )
     parser.add_argument(
-        'pytest_args', nargs='*', help='Extra pytest arguments',
+        'pytest_args',
+        nargs='*',
+        help='Extra pytest arguments',
     )
     args = parser.parse_args()
 

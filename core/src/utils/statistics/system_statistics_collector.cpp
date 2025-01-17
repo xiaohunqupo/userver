@@ -1,87 +1,53 @@
 #include <userver/utils/statistics/system_statistics_collector.hpp>
 
-#include <chrono>
-
-#include <boost/algorithm/string/predicate.hpp>
-
 #include <userver/components/component.hpp>
 #include <userver/components/statistics_storage.hpp>
-#include <userver/formats/json/value.hpp>
-#include <userver/formats/json/value_builder.hpp>
-#include <userver/utils/statistics/metadata.hpp>
+#include <userver/engine/async.hpp>
 #include <userver/yaml_config/merge_schemas.hpp>
 
 USERVER_NAMESPACE_BEGIN
 
 namespace components {
-namespace {
-constexpr auto kDefaultStatsUpdateInterval = std::chrono::minutes{1};
-}  // namespace
 
-SystemStatisticsCollector::SystemStatisticsCollector(
-    const ComponentConfig& config, const ComponentContext& context)
-    : LoggableComponentBase(config, context),
+SystemStatisticsCollector::SystemStatisticsCollector(const ComponentConfig& config, const ComponentContext& context)
+    : ComponentBase(config, context),
       with_nginx_(config["with-nginx"].As<bool>(false)),
-      statistics_holder_(context.FindComponent<components::StatisticsStorage>()
-                             .GetStorage()
-                             .RegisterExtender("", [this](const auto& request) {
-                               return ExtendStatistics(request);
-                             })) {
-  const auto fs_task_processor_name =
-      config["fs-task-processor"].As<std::string>();
-  const auto stats_update_period =
-      config["update-interval"].As<std::chrono::seconds>(
-          kDefaultStatsUpdateInterval);
-  engine::AsyncNoSpan(context.GetTaskProcessor(fs_task_processor_name),
-                      [this, stats_update_period] {
-                        update_task_.Start(
-                            std::string{kName},
-                            {stats_update_period,
-                             {utils::PeriodicTask::Flags::kNow,
-                              utils::PeriodicTask::Flags::kStrong}},
-                            [this] { UpdateStats(); });
-                      })
-      .Get();
+      fs_task_processor_(context.GetTaskProcessor(config["fs-task-processor"].As<std::string>())),
+      periodic_("system_statistics_collector", {std::chrono::seconds(10), {utils::PeriodicTask::Flags::kNow}}, [this] {
+          ProcessTimer();
+      }) {
+    statistics_holder_ = context.FindComponent<components::StatisticsStorage>().GetStorage().RegisterWriter(
+        "", [this](utils::statistics::Writer& writer) { ExtendStatistics(writer); }
+    );
 }
 
-formats::json::Value SystemStatisticsCollector::ExtendStatistics(
-    const utils::statistics::StatisticsRequest& request) {
-  formats::json::ValueBuilder stats(formats::json::Type::kObject);
-  if (request.prefix.empty()) {
-    auto self_locked = self_stats_.Lock();
-    stats = *self_locked;
-  }
+SystemStatisticsCollector::~SystemStatisticsCollector() { statistics_holder_.Unregister(); }
 
-  if (with_nginx_ && (boost::algorithm::starts_with(request.prefix, "nginx") ||
-                      boost::algorithm::starts_with("nginx", request.prefix))) {
-    auto nginx_stats = stats["nginx"];
-    {
-      auto nginx_locked = nginx_stats_.Lock();
-      nginx_stats = *nginx_locked;
-    }
-    utils::statistics::SolomonLabelValue(nginx_stats, "application");
-  }
-  return stats.ExtractValue();
+void SystemStatisticsCollector::ProcessTimer() {
+    engine::CriticalAsyncNoSpan(fs_task_processor_, [&] {
+        auto self = utils::statistics::impl::GetSelfSystemStatistics();
+        utils::statistics::impl::SystemStats nginx;
+        if (with_nginx_) {
+            nginx = utils::statistics::impl::GetSystemStatisticsByExeName("nginx");
+        }
+
+        auto data = data_.UniqueLock();
+        data->last_stats = self;
+        data->last_nginx_stats = nginx;
+    }).Get();
 }
 
-void SystemStatisticsCollector::UpdateStats() {
-  auto self_current = utils::statistics::impl::GetSelfSystemStatistics();
-  {
-    auto self_locked = self_stats_.Lock();
-    *self_locked = self_current;
-  }
-  if (with_nginx_) {
-    auto nginx_current =
-        utils::statistics::impl::GetSystemStatisticsByExeName("nginx");
-    {
-      auto nginx_locked = nginx_stats_.Lock();
-      *nginx_locked = nginx_current;
+void SystemStatisticsCollector::ExtendStatistics(utils::statistics::Writer& writer) {
+    auto data = data_.Lock();
+
+    DumpMetric(writer, data->last_stats);
+    if (with_nginx_) {
+        writer.ValueWithLabels(data->last_nginx_stats, {"application", "nginx"});
     }
-  }
 }
 
 yaml_config::Schema SystemStatisticsCollector::GetStaticConfigSchema() {
-  return yaml_config::MergeSchemas<LoggableComponentBase>(R"(
+    return yaml_config::MergeSchemas<ComponentBase>(R"(
 type: object
 description: Component for system resource usage statistics collection.
 additionalProperties: false
@@ -89,10 +55,6 @@ properties:
     fs-task-processor:
         type: string
         description: Task processor to use for statistics gathering
-    update-interval:
-        type: string
-        description: Statistics collection interval
-        defaultDescription: 1m
     with-nginx:
         type: boolean
         description: Whether to collect and report nginx processes statistics

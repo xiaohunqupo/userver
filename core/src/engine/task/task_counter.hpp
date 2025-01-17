@@ -1,133 +1,171 @@
 #pragma once
 
-#include <atomic>
-#include <chrono>
+#include <array>
 #include <cstddef>
-#include <thread>
 
-#include <userver/utils/assert.hpp>
-#include <userver/utils/statistics/aggregated_values.hpp>
+#include <boost/range/adaptor/transformed.hpp>
+
+#include <userver/concurrent/impl/asymmetric_fence.hpp>
+#include <userver/concurrent/impl/interference_shield.hpp>
+#include <userver/concurrent/impl/striped_read_indicator.hpp>
+#include <userver/concurrent/striped_counter.hpp>
+#include <userver/utils/fixed_array.hpp>
+#include <userver/utils/statistics/rate_counter.hpp>
 
 USERVER_NAMESPACE_BEGIN
 
 namespace engine::impl {
 
 class TaskCounter final {
- public:
-  class Token final {
-   public:
-    explicit Token(TaskCounter& counter) : counter_(counter) {
-      ++counter_.tasks_alive_;
-      ++counter_.tasks_created_;
+    using Rate = utils::statistics::Rate;
+
+public:
+    class Token;
+    class CoroToken;
+    class RunningToken;
+
+    explicit TaskCounter(std::size_t thread_count);
+
+    ~TaskCounter();
+
+    void WaitForExhaustionBlocking() const noexcept;
+
+    // May return 'true' when there are no tasks alive (due to races).
+    // Never returns 'false' when there are tasks alive.
+    bool MayHaveTasksAlive() const noexcept;
+
+    // May return 'true' when there are no tasks alive (due to races).
+    // Never returns 'false' when there are tasks alive.
+    template <typename TaskCounterRange>
+    static bool AnyMayHaveTasksAlive(TaskCounterRange&& counters) {
+        concurrent::impl::AsymmetricThreadFenceHeavy();
+        return !concurrent::impl::StripedReadIndicator::AreAllFree(
+            counters |
+            boost::adaptors::transformed([](const TaskCounter& counter) -> auto& { return counter.tasks_alive_; })
+        );
     }
-    ~Token() { --counter_.tasks_alive_; }
+
+    Rate GetCreatedTasks() const noexcept;
+
+    Rate GetDestroyedTasks() const noexcept;
+
+    Rate GetStartedTasks() const noexcept;
+
+    Rate GetStoppedTasks() const noexcept;
+
+    Rate GetCancelledTasks() const noexcept;
+
+    Rate GetCancelledTasksOverload() const noexcept;
+
+    Rate GetTasksOverload() const noexcept;
+
+    Rate GetTasksOverloadSensor() const noexcept;
+
+    Rate GetTasksNoOverloadSensor() const noexcept;
+
+    Rate GetSpuriousWakeups() const noexcept;
+
+    Rate GetTasksStartedRunning() const noexcept;
+
+    std::uint64_t GetRunningTasks() const noexcept;
+
+    void AccountTaskCancel() noexcept;
+
+    void AccountTaskCancelOverload() noexcept;
+
+    void AccountTaskOverload() noexcept;
+
+    void AccountTaskOverloadSensor() noexcept;
+
+    void AccountTaskNoOverloadSensor() noexcept;
+
+    void AccountSpuriousWakeup() noexcept;
+
+private:
+    // Counters that may be mutated from outside the bound TaskProcessor.
+    enum class GlobalCounterId : std::size_t {
+        kCancelOverload,
+        kOverload,
+
+        kCountersSize,
+    };
+
+    // Counters that are only mutated from the bound TaskProcessor.
+    enum class LocalCounterId : std::size_t {
+        kStarted,
+        kStopped,
+        kCancelled,
+        kSpuriousWakeups,
+        kOverloadSensor,
+        kNoOverloadSensor,
+        kStartedRunning,
+        kStoppedRunning,
+
+        kCountersSize,
+    };
+
+    static constexpr auto kLocalCountersSize = static_cast<std::size_t>(LocalCounterId::kCountersSize);
+    static constexpr auto kGlobalCountersSize = static_cast<std::size_t>(GlobalCounterId::kCountersSize);
+
+    using Counter = utils::statistics::RateCounter;
+
+    using LocalCounterPack = concurrent::impl::InterferenceShield<std::array<Counter, kLocalCountersSize>>;
+
+    using GlobalCounterPack = std::array<concurrent::StripedCounter, kGlobalCountersSize>;
+
+    Rate GetApproximate(LocalCounterId) const noexcept;
+
+    Rate GetApproximate(GlobalCounterId) const noexcept;
+
+    void Increment(LocalCounterId) noexcept;
+
+    void Increment(GlobalCounterId) noexcept;
+
+    GlobalCounterPack global_counters_;
+    utils::FixedArray<LocalCounterPack> local_counters_;
+    concurrent::impl::StripedReadIndicator tasks_alive_;
+};
+
+class TaskCounter::Token final {
+public:
+    explicit Token(TaskCounter& counter) noexcept;
 
     Token(const Token&) = delete;
-    Token(Token&&) = delete;
     Token& operator=(const Token&) = delete;
-    Token& operator=(Token&&) = delete;
+    Token(Token&&) noexcept = default;
+    Token& operator=(Token&&) noexcept = default;
 
-   private:
-    TaskCounter& counter_;
-  };
+private:
+    concurrent::impl::StripedReadIndicatorLock lock_;
+};
 
-  class CoroToken final {
-   public:
-    explicit CoroToken(TaskCounter& counter) : counter_(&counter) {
-      ++counter_->tasks_running_;
-    }
-    ~CoroToken() {
-      if (counter_) --counter_->tasks_running_;
-    }
+class TaskCounter::CoroToken final {
+public:
+    explicit CoroToken(TaskCounter& counter) noexcept;
 
     CoroToken(const CoroToken&) = delete;
-
-    CoroToken(CoroToken&& other) noexcept
-        : counter_(std::exchange(other.counter_, nullptr)) {}
-
     CoroToken& operator=(const CoroToken&) = delete;
+    CoroToken(CoroToken&& other) noexcept;
+    CoroToken& operator=(CoroToken&& rhs) noexcept;
+    ~CoroToken();
 
-    CoroToken& operator=(CoroToken&& rhs) noexcept {
-      counter_ = std::exchange(rhs.counter_, nullptr);
-      return *this;
-    }
-
-   private:
+private:
     TaskCounter* counter_;
-  };
-
-  ~TaskCounter() { UASSERT(!tasks_alive_); }
-
-  template <typename Rep, typename Period>
-  void WaitForExhaustion(
-      const std::chrono::duration<Rep, Period>& check_period) const {
-    while (tasks_alive_ > 0) {
-      std::this_thread::sleep_for(check_period);
-    }
-  }
-
-  size_t GetCurrentValue() const { return tasks_alive_; }
-
-  size_t GetCreatedTasks() const { return tasks_created_; }
-
-  size_t GetRunningTasks() const { return tasks_running_; }
-
-  size_t GetCancelledTasks() const { return tasks_cancelled_; }
-
-  size_t GetCancelledTasksOverload() const { return tasks_cancelled_overload_; }
-
-  size_t GetTasksOverload() const { return tasks_overload_; }
-
-  size_t GetTasksOverloadSensor() const { return tasks_overload_sensor_; }
-
-  size_t GetTasksNoOverloadSensor() const { return tasks_no_overload_sensor_; }
-
-  size_t GetTaskSwitchFast() const { return tasks_switch_fast_; }
-
-  size_t GetTaskSwitchSlow() const { return tasks_switch_slow_; }
-
-  size_t GetSpuriousWakeups() const { return spurious_wakeups_; }
-
-  void AccountTaskCancel() noexcept { tasks_cancelled_++; }
-
-  void AccountTaskCancelOverload() noexcept { tasks_cancelled_overload_++; }
-
-  void AccountTaskOverload() noexcept { tasks_overload_++; }
-
-  void AccountTaskOverloadSensor() { tasks_overload_sensor_++; }
-
-  void AccountTaskNoOverloadSensor() { tasks_no_overload_sensor_++; }
-
-  void AccountTaskSwitchFast() { tasks_switch_fast_++; }
-
-  void AccountTaskSwitchSlow() { tasks_switch_slow_++; }
-
-  void AccountSpuriousWakeup() { spurious_wakeups_++; }
-
-  void AccountTaskExecution(std::chrono::microseconds us) {
-    task_processor_profiler_timings_.Add(us.count(), 1);
-  }
-
-  const auto& GetTaskExecutionTimings() const {
-    return task_processor_profiler_timings_;
-  }
-
- private:
-  std::atomic<size_t> tasks_alive_{0};
-  std::atomic<size_t> tasks_created_{0};
-  std::atomic<size_t> tasks_running_{0};
-  std::atomic<size_t> tasks_cancelled_{0};
-  std::atomic<size_t> tasks_switch_fast_{0};
-  std::atomic<size_t> tasks_switch_slow_{0};
-  std::atomic<size_t> spurious_wakeups_{0};
-  std::atomic<size_t> tasks_cancelled_overload_{0};
-  std::atomic<size_t> tasks_overload_{0};
-
-  std::atomic<size_t> tasks_overload_sensor_{0};
-  std::atomic<size_t> tasks_no_overload_sensor_{0};
-
-  utils::statistics::AggregatedValues<25> task_processor_profiler_timings_;
 };
+
+class TaskCounter::RunningToken final {
+public:
+    explicit RunningToken(impl::TaskCounter& counter) noexcept;
+
+    RunningToken(RunningToken&& other) noexcept;
+    RunningToken& operator=(RunningToken&& rhs) noexcept;
+    ~RunningToken();
+
+private:
+    TaskCounter& counter_;
+};
+
+void SetLocalTaskCounterData(TaskCounter& counter, std::size_t thread_id);
 
 }  // namespace engine::impl
 

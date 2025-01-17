@@ -18,7 +18,7 @@ namespace server::handlers {
 
 /// @ingroup userver_components userver_http_handlers
 ///
-/// @brief Handler that controlls logging levels of all the loggers.
+/// @brief Handler that controls logging levels of all the loggers.
 ///
 /// The component has no service configuration except the
 /// @ref userver_http_handlers "common handler options".
@@ -43,39 +43,36 @@ namespace server::handlers {
 /// query argument. Set it to the `reset` value, to reset the logger level to
 /// the initial values.
 ///
-/// @see @ref md_en_userver_log_level_running_service
+/// @see @ref scripts/docs/en/userver/log_level_running_service.md
 
 // clang-format on
 class LogLevel final : public HttpHandlerBase {
- public:
-  LogLevel(const components::ComponentConfig& config,
-           const components::ComponentContext& component_context);
+public:
+    LogLevel(const components::ComponentConfig& config, const components::ComponentContext& component_context);
 
-  static constexpr std::string_view kName = "handler-log-level";
+    /// @ingroup userver_component_names
+    /// @brief The default name of server::handlers::LogLevel
+    static constexpr std::string_view kName = "handler-log-level";
 
-  std::string HandleRequestThrow(const http::HttpRequest& request,
-                                 request::RequestContext&) const override;
+    std::string HandleRequestThrow(const http::HttpRequest& request, request::RequestContext&) const override;
 
-  static yaml_config::Schema GetStaticConfigSchema();
+    static yaml_config::Schema GetStaticConfigSchema();
 
- private:
-  std::string ProcessGet(const http::HttpRequest& request,
-                         request::RequestContext&) const;
-  std::string ProcessPut(const http::HttpRequest& request,
-                         request::RequestContext&) const;
+private:
+    std::string ProcessGet(const http::HttpRequest& request, request::RequestContext&) const;
+    std::string ProcessPut(const http::HttpRequest& request, request::RequestContext&) const;
 
-  components::Logging& logging_component_;
-  struct Data {
-    logging::Level default_init_level;
-    mutable std::unordered_map<std::string, logging::Level> init_levels;
-  };
-  concurrent::Variable<Data> data_;
+    components::Logging& logging_component_;
+    struct Data {
+        logging::Level default_init_level;
+        mutable std::unordered_map<std::string, logging::Level> init_levels;
+    };
+    concurrent::Variable<Data> data_;
 };
 
 }  // namespace server::handlers
 
 template <>
-inline constexpr bool components::kHasValidate<server::handlers::LogLevel> =
-    true;
+inline constexpr bool components::kHasValidate<server::handlers::LogLevel> = true;
 
 USERVER_NAMESPACE_END

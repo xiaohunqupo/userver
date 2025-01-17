@@ -1,8 +1,5 @@
 project(userver-postgresql CXX)
 
-find_package(Boost REQUIRED regex)
-
-
 option(USERVER_FEATURE_PATCH_LIBPQ "Apply patches to the libpq (add portals support)" ON)
 add_library(userver-libpq INTERFACE)
 if (USERVER_FEATURE_PATCH_LIBPQ)
@@ -11,110 +8,65 @@ if (USERVER_FEATURE_PATCH_LIBPQ)
 else()
   set_source_files_properties(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/storages/postgres/detail/pg_connection_wrapper.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/storages/postgres/portal.cpp
     PROPERTIES COMPILE_FLAGS -DUSERVER_NO_LIBPQ_PATCHES=1
   )
 
-  find_library(LIBPQ_LIBRARIES NAMES libpq.a libpq.so)
-  if (NOT LIBPQ_LIBRARIES)
-    message(FATAL_ERROR "Failed to find libpq")
+  if(USERVER_CONAN)
+    find_package(PostgreSQL REQUIRED CONFIG)
+  else()
+    find_library(PostgreSQL_LIBRARY NAMES libpq.so libpq.dylib REQUIRED)
+    find_package(PostgreSQL REQUIRED)
   endif()
-  target_link_libraries(userver-libpq INTERFACE ${LIBPQ_LIBRARIES})
+  target_link_libraries(userver-libpq INTERFACE PostgreSQL::PostgreSQL)
 endif()
 
-file(GLOB_RECURSE SOURCES
-  ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/*.hpp)
-
-file(GLOB_RECURSE UNIT_TEST_SOURCES
-  ${CMAKE_CURRENT_SOURCE_DIR}/*_test.cpp
-)
-list(REMOVE_ITEM SOURCES ${UNIT_TEST_SOURCES})
-
-file(GLOB_RECURSE PG_TEST_SOURCES
-  ${CMAKE_CURRENT_SOURCE_DIR}/*_pgtest.cpp
-)
-list(REMOVE_ITEM SOURCES ${PG_TEST_SOURCES})
-
-file(GLOB_RECURSE PG_FUNCTIONAL_TEST_SOURCES
-  ${CMAKE_CURRENT_SOURCE_DIR}/functional_tests/*
-)
-list(REMOVE_ITEM SOURCES ${PG_FUNCTIONAL_TEST_SOURCES})
-
-file(GLOB_RECURSE BENCH_SOURCES
-  ${CMAKE_CURRENT_SOURCE_DIR}/*_benchmark.cpp
-)
-list (REMOVE_ITEM SOURCES ${BENCH_SOURCES})
-
-
-add_library(${PROJECT_NAME} STATIC ${SOURCES})
-
-set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE CXX)
-
-target_include_directories(${PROJECT_NAME} PUBLIC
-  ${CMAKE_CURRENT_SOURCE_DIR}/include
-  PRIVATE
-  ${CMAKE_CURRENT_SOURCE_DIR}/src
-)
-target_include_directories (${PROJECT_NAME} PRIVATE
-    $<TARGET_PROPERTY:userver-core,INCLUDE_DIRECTORIES>
+# Versions of postgresql-server and libpq may diverge "in the wild",
+# and we'd like to still be able to build userver postgres in such environments.
+# When using APIs of libpq, we sometimes need its version as a macro to know
+# which features are available. PG_VERSION_NUM is not suitable, because it is
+# provided by postgresql-server, not by libpq. There is PQlibVersion function,
+# but no version macro in libpq itself. Workaround: run a simple program
+# at build time that calls PQlibVersion.
+add_subdirectory(libpq-version-generator)
+set(LIBPQ_VERSION_DIR "${CMAKE_CURRENT_BINARY_DIR}/libpq_version")
+add_custom_command(
+    OUTPUT "${LIBPQ_VERSION_DIR}/userver_libpq_version.hpp"
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "${LIBPQ_VERSION_DIR}"
+    COMMAND $<TARGET_FILE:userver-impl-libpq-version-generator>
+    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+    COMMENT "Running gRPC C++ protocol buffer compiler for ${root_path}"
 )
 
-target_link_libraries(${PROJECT_NAME}
-  PUBLIC
-    userver-core
-  PRIVATE
-    userver-libpq
-    Boost::regex
+userver_module(postgresql
+    SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}"
+    LINK_LIBRARIES_PRIVATE userver-libpq
+    INCLUDE_DIRS_PRIVATE "${LIBPQ_VERSION_DIR}"
+    UTEST_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/*_test.cpp"
+    DBTEST_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/*_pgtest.cpp"
+    DBTEST_DATABASES postgresql
+    DBTEST_ENV POSTGRES_TEST_DSN=postgresql://testsuite@localhost:15433/postgres
+    UBENCH_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/*_benchmark.cpp"
+    UBENCH_LINK_LIBRARIES userver-libpq
+    UBENCH_DATABASES postgresql
+    UBENCH_ENV POSTGRES_DSN_BENCH=postgresql://testsuite@localhost:15433/postgres
 )
 
-if (USERVER_IS_THE_ROOT_PROJECT)
-  add_executable(${PROJECT_NAME}_unittest ${UNIT_TEST_SOURCES})
-  target_include_directories (${PROJECT_NAME}_unittest PRIVATE
-      $<TARGET_PROPERTY:${PROJECT_NAME},INCLUDE_DIRECTORIES>
-  )
-  target_link_libraries(${PROJECT_NAME}_unittest PUBLIC
-    userver-utest
-    ${PROJECT_NAME}
-  )
-  add_google_tests(${PROJECT_NAME}_unittest)
+target_sources(${PROJECT_NAME} PRIVATE "${LIBPQ_VERSION_DIR}/userver_libpq_version.hpp")
 
-  add_executable(${PROJECT_NAME}_benchmark ${BENCH_SOURCES})
-  target_link_libraries(${PROJECT_NAME}_benchmark PRIVATE
-      userver-ubench
-      ${PROJECT_NAME}
-      userver-libpq
-  )
-  target_include_directories(${PROJECT_NAME}_benchmark
-      PRIVATE
-      ${CMAKE_CURRENT_SOURCE_DIR}/src
-  )
-  add_test(NAME ${PROJECT_NAME}_benchmark COMMAND env
-      POSTGRES_DSN_BENCH=postgresql://testsuite@localhost:15433/postgres
-      ${CMAKE_BINARY_DIR}/testsuite/env
-      --databases=postgresql
-      run --
-      $<TARGET_FILE:${PROJECT_NAME}_benchmark>
-      --benchmark_min_time=0
-      --benchmark_color=no
-  )
+_userver_install_targets(COMPONENT postgres TARGETS userver-libpq)
+_userver_directory_install(COMPONENT postgres FILES
+    "${USERVER_ROOT_DIR}/cmake/UserverSql.cmake"
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/userver"
+)
+_userver_directory_install(COMPONENT postgres
+    DIRECTORY "${USERVER_ROOT_DIR}/scripts/sql"
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/userver/scripts"
+)
 
-  add_executable(${PROJECT_NAME}_pgtest ${PG_TEST_SOURCES})
-  target_include_directories (${PROJECT_NAME}_pgtest PRIVATE
-      $<TARGET_PROPERTY:${PROJECT_NAME},INCLUDE_DIRECTORIES>
-  )
-  target_link_libraries(${PROJECT_NAME}_pgtest userver-utest ${PROJECT_NAME})
-  add_test(NAME ${PROJECT_NAME}_pgtest COMMAND env
-      POSTGRES_TEST_DSN=postgresql://testsuite@localhost:15433/postgres
-      ${CMAKE_BINARY_DIR}/testsuite/env
-      --databases=postgresql
-      run --
-      $<TARGET_FILE:${PROJECT_NAME}_pgtest>
-      --gtest_output=xml:${CMAKE_BINARY_DIR}/test-results/${PROJECT_NAME}_pgtest.xml
-  )
-
+if (USERVER_BUILD_TESTS)
   add_subdirectory(functional_tests)
 endif()
 
-# Target with no need to use userver namespace, but includes require userver/
-add_library(yandex-${PROJECT_NAME} INTERFACE)
-target_link_libraries(yandex-${PROJECT_NAME} INTERFACE ${PROJECT_NAME})
+set(USERVER_DIR "${USERVER_ROOT_DIR}")
+include(UserverSql)

@@ -1,7 +1,5 @@
 #pragma once
 
-#include <arpa/inet.h>
-
 #include <cstdint>
 #include <cstdlib>
 #include <stdexcept>
@@ -16,31 +14,32 @@ USERVER_NAMESPACE_BEGIN
 namespace internal::net {
 
 enum class IpVersion {
-  kV6,
-  kV4,
+    kV6,
+    kV4,
 };
 
 struct TcpListener {
-  explicit TcpListener(IpVersion ipv = IpVersion::kV6);
+    constexpr static auto kType = engine::io::SocketType::kStream;
 
-  std::pair<engine::io::Socket, engine::io::Socket> MakeSocketPair(
-      engine::Deadline);
+    explicit TcpListener(IpVersion ipv = IpVersion::kV6);
 
-  constexpr static auto type = engine::io::SocketType::kStream;
+    std::pair<engine::io::Socket, engine::io::Socket> MakeSocketPair(engine::Deadline);
 
-  uint16_t port{0};
-  engine::io::Sockaddr addr;
-  engine::io::Socket socket;
+    std::uint16_t Port() const { return addr.Port(); }
+
+    engine::io::Sockaddr addr;
+    engine::io::Socket socket;
 };
 
 struct UdpListener {
-  explicit UdpListener(IpVersion ipv = IpVersion::kV6);
+    constexpr static auto kType = engine::io::SocketType::kDgram;
 
-  constexpr static auto type = engine::io::SocketType::kDgram;
+    explicit UdpListener(IpVersion ipv = IpVersion::kV6);
 
-  uint16_t port{0};
-  engine::io::Sockaddr addr;
-  engine::io::Socket socket;
+    std::uint16_t Port() const { return addr.Port(); }
+
+    engine::io::Sockaddr addr;
+    engine::io::Socket socket;
 };
 
 }  // namespace internal::net

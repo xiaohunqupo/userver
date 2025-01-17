@@ -57,26 +57,25 @@ namespace server::handlers {
 /// `DELETE` request removes the forced logging from location. Location should
 /// be specified in the `location=` argument in URL.
 ///
-/// @see @ref md_en_userver_log_level_running_service
+/// @see @ref scripts/docs/en/userver/log_level_running_service.md
 
 // clang-format on
 class DynamicDebugLog final : public HttpHandlerBase {
- public:
-  DynamicDebugLog(const components::ComponentConfig& config,
-                  const components::ComponentContext& component_context);
+public:
+    DynamicDebugLog(const components::ComponentConfig& config, const components::ComponentContext& component_context);
 
-  static constexpr std::string_view kName = "handler-dynamic-debug-log";
+    /// @ingroup userver_component_names
+    /// @brief The default name of server::handlers::DynamicDebugLog
+    static constexpr std::string_view kName = "handler-dynamic-debug-log";
 
-  std::string HandleRequestThrow(const http::HttpRequest& request,
-                                 request::RequestContext&) const override;
+    std::string HandleRequestThrow(const http::HttpRequest& request, request::RequestContext&) const override;
 
-  static yaml_config::Schema GetStaticConfigSchema();
+    static yaml_config::Schema GetStaticConfigSchema();
 };
 
 }  // namespace server::handlers
 
 template <>
-inline constexpr bool
-    components::kHasValidate<server::handlers::DynamicDebugLog> = true;
+inline constexpr bool components::kHasValidate<server::handlers::DynamicDebugLog> = true;
 
 USERVER_NAMESPACE_END

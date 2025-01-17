@@ -4,8 +4,8 @@
 #include <thread>
 
 #include <userver/engine/async.hpp>
+#include <userver/engine/impl/task_context_holder.hpp>
 #include <userver/engine/run_standalone.hpp>
-#include <userver/utils/impl/wrapped_call.hpp>
 
 #include <engine/impl/wait_list.hpp>
 #include <engine/task/task_context.hpp>
@@ -20,167 +20,163 @@ namespace {
 constexpr std::size_t kTasksCount = 1024 * 64;
 constexpr std::size_t kIterationsCount = 1024 * 16;
 
-engine::impl::TaskPayload MakeEmptyPayload() {
-  return utils::impl::WrapCall([] {});
+boost::intrusive_ptr<TaskContext> MakeContext() {
+    return engine::impl::MakeTask(
+               {engine::current_task::GetTaskProcessor(),
+                engine::Task::Importance::kNormal,
+                engine::Task::WaitMode::kSingleWaiter,
+                {}},
+               [] {}
+    ).Extract();
 }
 
 auto MakeContexts() {
-  std::vector<boost::intrusive_ptr<TaskContext>> contexts;
-  contexts.reserve(kTasksCount);
-  for (std::size_t i = 0; i < kTasksCount; ++i) {
-    contexts.push_back(new TaskContext(engine::current_task::GetTaskProcessor(),
-                                       engine::Task::Importance::kNormal,
-                                       engine::Task::WaitMode::kSingleWaiter,
-                                       {}, MakeEmptyPayload()));
-  }
+    std::vector<boost::intrusive_ptr<TaskContext>> contexts;
+    contexts.reserve(kTasksCount);
+    for (std::size_t i = 0; i < kTasksCount; ++i) {
+        contexts.push_back(MakeContext());
+    }
 
-  return contexts;
+    return contexts;
 }
 
 }  // namespace
 
 void wait_list_insertion(benchmark::State& state) {
-  engine::RunStandalone([&] {
-    std::size_t i = 0;
-    WaitList wl;
+    engine::RunStandalone([&] {
+        std::size_t i = 0;
+        WaitList wl;
 
-    auto contexts = MakeContexts();
-    {
-      WaitList::Lock guard{wl};
-      for (auto _ : state) {
-        wl.Append(guard, contexts[i]);
+        auto contexts = MakeContexts();
+        {
+            WaitList::Lock guard{wl};
+            for ([[maybe_unused]] auto _ : state) {
+                wl.Append(guard, contexts[i]);
 
-        if (++i == kTasksCount) {
-          state.PauseTiming();
-          while (i--) {
-            wl.Remove(guard, *contexts[i]);
-          }
-          state.ResumeTiming();
+                if (++i == kTasksCount) {
+                    state.PauseTiming();
+                    while (i--) {
+                        wl.Remove(guard, *contexts[i]);
+                    }
+                    state.ResumeTiming();
+                }
+            }
         }
-      }
-    }
 
-    WaitList::Lock guard{wl};
-    while (i--) {
-      wl.Remove(guard, *contexts[i]);
-    }
-  });
+        WaitList::Lock guard{wl};
+        while (i--) {
+            wl.Remove(guard, *contexts[i]);
+        }
+    });
 }
 BENCHMARK(wait_list_insertion)->Iterations(kIterationsCount);
 
 void wait_list_removal(benchmark::State& state) {
-  engine::RunStandalone([&] {
-    WaitList wl;
+    engine::RunStandalone([&] {
+        WaitList wl;
 
-    auto contexts = MakeContexts();
+        auto contexts = MakeContexts();
 
-    WaitList::Lock guard{wl};
-    for (auto c : contexts) {
-      wl.Append(guard, c);
-    }
-
-    std::size_t i = 0;
-    for (auto _ : state) {
-      wl.Remove(guard, *contexts[i]);
-
-      if (++i == kTasksCount) {
-        state.PauseTiming();
-        i = 0;
-        {
-          for (auto c : contexts) {
+        WaitList::Lock guard{wl};
+        for (const auto& c : contexts) {
             wl.Append(guard, c);
-          }
         }
-        state.ResumeTiming();
-      }
-    }
 
-    while (i != kTasksCount) {
-      wl.Remove(guard, *contexts[i]);
-      ++i;
-    }
-  });
+        std::size_t i = 0;
+        for ([[maybe_unused]] auto _ : state) {
+            wl.Remove(guard, *contexts[i]);
+
+            if (++i == kTasksCount) {
+                state.PauseTiming();
+                i = 0;
+                {
+                    for (const auto& c : contexts) {
+                        wl.Append(guard, c);
+                    }
+                }
+                state.ResumeTiming();
+            }
+        }
+
+        while (i != kTasksCount) {
+            wl.Remove(guard, *contexts[i]);
+            ++i;
+        }
+    });
 }
 BENCHMARK(wait_list_removal)->Iterations(kIterationsCount);
 
 void wait_list_add_remove_contention(benchmark::State& state) {
-  engine::RunStandalone(state.range(0), [&] {
-    std::atomic<bool> run{true};
-    WaitList wl;
+    engine::RunStandalone(state.range(0), [&] {
+        std::atomic<bool> run{true};
+        WaitList wl;
 
-    std::vector<engine::TaskWithResult<void>> tasks;
-    for (int i = 0; i < state.range(0) - 1; i++)
-      tasks.push_back(engine::AsyncNoSpan([&]() {
-        boost::intrusive_ptr<TaskContext> ctx = new TaskContext(
-            engine::current_task::GetTaskProcessor(),
-            engine::Task::Importance::kNormal,
-            engine::Task::WaitMode::kSingleWaiter, {}, MakeEmptyPayload());
-        while (run) {
-          {
-            WaitList::Lock guard{wl};
-            wl.Append(guard, ctx);
-          }
-          WaitList::Lock guard{wl};
-          wl.Remove(guard, *ctx);
-        }
-      }));
+        std::vector<engine::TaskWithResult<void>> tasks;
+        tasks.reserve(state.range(0) - 1);
+        for (int i = 0; i < state.range(0) - 1; i++)
+            tasks.push_back(engine::AsyncNoSpan([&]() {
+                boost::intrusive_ptr<TaskContext> ctx = MakeContext();
+                while (run) {
+                    {
+                        WaitList::Lock guard{wl};
+                        wl.Append(guard, ctx);
+                    }
+                    WaitList::Lock guard{wl};
+                    wl.Remove(guard, *ctx);
+                }
+            }));
 
-    boost::intrusive_ptr<TaskContext> ctx = new TaskContext(
-        engine::current_task::GetTaskProcessor(),
-        engine::Task::Importance::kNormal,
-        engine::Task::WaitMode::kSingleWaiter, {}, MakeEmptyPayload());
-    for (auto _ : state) {
-      {
-        WaitList::Lock guard{wl};
-        wl.Append(guard, ctx);
-      }
-      WaitList::Lock guard{wl};
-      wl.Remove(guard, *ctx);
-    }
-
-    run = false;
-  });
-}
-BENCHMARK(wait_list_add_remove_contention)
-    ->RangeMultiplier(2)
-    ->Range(1, 2)
-    ->UseRealTime();
-
-void wait_list_add_remove_contention_unbalanced(benchmark::State& state) {
-  engine::RunStandalone(state.range(0), [&] {
-    std::atomic<bool> run{true};
-    WaitList wl;
-
-    std::vector<engine::TaskWithResult<void>> tasks;
-    for (int i = 0; i < state.range(0) - 1; i++)
-      tasks.push_back(engine::AsyncNoSpan([&]() {
-        auto contexts = MakeContexts();
-        while (run) {
-          for (auto& ctx : contexts) {
-            WaitList::Lock guard{wl};
-            wl.Append(guard, ctx);
-          }
-          for (auto& ctx : contexts) {
+        boost::intrusive_ptr<TaskContext> ctx = MakeContext();
+        for ([[maybe_unused]] auto _ : state) {
+            {
+                WaitList::Lock guard{wl};
+                wl.Append(guard, ctx);
+            }
             WaitList::Lock guard{wl};
             wl.Remove(guard, *ctx);
-          }
         }
-      }));
 
-    auto contexts = MakeContexts();
-    for (auto _ : state) {
-      for (auto& ctx : contexts) {
-        WaitList::Lock guard{wl};
-        wl.Append(guard, ctx);
-      }
-      for (auto& ctx : contexts) {
-        WaitList::Lock guard{wl};
-        wl.Remove(guard, *ctx);
-      }
-    }
+        run = false;
+    });
+}
+BENCHMARK(wait_list_add_remove_contention)->RangeMultiplier(2)->Range(1, 2)->UseRealTime();
 
-    run = false;
-  });
+void wait_list_add_remove_contention_unbalanced(benchmark::State& state) {
+    engine::RunStandalone(state.range(0), [&] {
+        std::atomic<bool> run{true};
+        WaitList wl;
+
+        std::vector<engine::TaskWithResult<void>> tasks;
+        tasks.reserve(state.range(0) - 1);
+        for (int i = 0; i < state.range(0) - 1; i++)
+            tasks.push_back(engine::AsyncNoSpan([&]() {
+                auto contexts = MakeContexts();
+                while (run) {
+                    for (auto& ctx : contexts) {
+                        WaitList::Lock guard{wl};
+                        wl.Append(guard, ctx);
+                    }
+                    for (auto& ctx : contexts) {
+                        WaitList::Lock guard{wl};
+                        wl.Remove(guard, *ctx);
+                    }
+                }
+            }));
+
+        auto contexts = MakeContexts();
+        for ([[maybe_unused]] auto _ : state) {
+            for (auto& ctx : contexts) {
+                WaitList::Lock guard{wl};
+                wl.Append(guard, ctx);
+            }
+            for (auto& ctx : contexts) {
+                WaitList::Lock guard{wl};
+                wl.Remove(guard, *ctx);
+            }
+        }
+
+        run = false;
+    });
 }
 
 // This benchmark has been restricted to using only 1 thread, because a single

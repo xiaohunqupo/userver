@@ -20,7 +20,9 @@ namespace server::handlers {
 
 /// @ingroup userver_components userver_http_handlers
 ///
-/// @brief Handler that allows to control the behavior of server from tests.
+/// @brief Handler that allows to control the behavior of server from tests,
+/// and @ref scripts/docs/en/userver/functional_testing.md "functional tests with testsuite"
+/// in particular.
 ///
 /// It is highly recommended to disable this handle in production via the
 /// @ref userver_components "load-enabled: false" option.
@@ -42,11 +44,11 @@ namespace server::handlers {
 /// @snippet components/common_server_component_list_test.cpp  Sample tests control component config
 ///
 /// ## Scheme
-/// The scheme matches the https://yandex.github.io/yandex-taxi-testsuite/
-/// expectations from `/tests/control` handle. In particular:
+/// Main user of the scheme is the pytest_userver.client.Client python class.
+/// In particular:
 /// @code
 /// {
-///     "action": "run_periodic_task" | "suspend_periodic_tasks" | "write_cache_dumps" | "read_cache_dumps"
+///     "action": "run_periodic_task" | "suspend_periodic_tasks" | "write_cache_dumps" | "read_cache_dumps" | "metrics_portability"
 ///     "testpoints": [<list of testpoints to register>]
 ///     "reset_metrics": true | false
 ///     "mock_now": <time in utils::datetime::Stringtime() acceptable format>
@@ -55,33 +57,32 @@ namespace server::handlers {
 ///     <...>
 /// }
 /// @endcode
+///
+/// @see @ref scripts/docs/en/userver/functional_testing.md
 
 // clang-format on
 class TestsControl final : public HttpHandlerJsonBase {
- public:
-  TestsControl(const components::ComponentConfig& config,
-               const components::ComponentContext& component_context);
-  ~TestsControl() override;
+public:
+    TestsControl(const components::ComponentConfig& config, const components::ComponentContext& component_context);
+    ~TestsControl() override;
 
-  static constexpr std::string_view kName = "tests-control";
+    /// @ingroup userver_component_names
+    /// @brief The default name of server::handlers::TestsControl
+    static constexpr std::string_view kName = "tests-control";
 
-  formats::json::Value HandleRequestJsonThrow(
-      const http::HttpRequest& request,
-      const formats::json::Value& request_body,
-      request::RequestContext& context) const override;
+    formats::json::Value HandleRequestJsonThrow(
+        const http::HttpRequest& request,
+        const formats::json::Value& request_body,
+        request::RequestContext& context
+    ) const override;
 
-  static yaml_config::Schema GetStaticConfigSchema();
+    static yaml_config::Schema GetStaticConfigSchema();
 
- private:
-  formats::json::Value PerformAction(
-      const std::string& action_name,
-      const formats::json::Value& request_body) const;
+private:
+    formats::json::Value PerformAction(const std::string& action_name, const formats::json::Value& request_body) const;
 
-  std::unique_ptr<testsuite::TestpointClientBase> testpoint_client_;
-  std::unordered_map<
-      std::string,
-      std::unique_ptr<testsuite::impl::actions::BaseTestsuiteAction>>
-      actions_;
+    std::unique_ptr<testsuite::TestpointClientBase> testpoint_client_;
+    std::unordered_map<std::string, std::unique_ptr<testsuite::impl::actions::BaseTestsuiteAction>> actions_;
 };
 
 }  // namespace server::handlers

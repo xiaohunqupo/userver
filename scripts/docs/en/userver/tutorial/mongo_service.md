@@ -4,7 +4,7 @@
 ## Before you start
 
 Make sure that you can compile and run core tests and read a basic example
-@ref md_en_userver_tutorial_hello_service.
+@ref scripts/docs/en/userver/tutorial/hello_service.md.
 
 
 ## Step by step guide
@@ -21,7 +21,7 @@ database. The service would have the following Rest API:
 
 ### HTTP handler component
 
-Like in @ref md_en_userver_tutorial_hello_service we create a component for
+Like in @ref scripts/docs/en/userver/tutorial/hello_service.md we create a component for
 handling HTTP requests:
 
 @snippet samples/mongo_service/mongo_service.cpp  Mongo service sample - component
@@ -38,7 +38,7 @@ a BSON document for insertion.
 
 @snippet samples/mongo_service/mongo_service.cpp  Mongo service sample - InsertNew
 
-There are different ways to form a document, see @ref md_en_userver_formats.
+There are different ways to form a document, see @ref scripts/docs/en/userver/formats.md.
 
 
 ### Translations::ReturnDiff
@@ -52,13 +52,13 @@ rewrite previous data for the same key.
 
 @snippet samples/mongo_service/mongo_service.cpp  Mongo service sample - ReturnDiff
 
-See @ref md_en_userver_mongodb for MongoDB hints and more usage samples.
+See @ref scripts/docs/en/userver/mongodb.md for MongoDB hints and more usage samples.
 
 
 ### Static config
 
 Static configuration of service is quite close to the configuration from
-@ref md_en_userver_tutorial_hello_service except for the handler and DB:
+@ref scripts/docs/en/userver/tutorial/hello_service.md except for the handler and DB:
 
 @snippet samples/mongo_service/static_config.yaml  Mongo service sample - static config
 
@@ -66,25 +66,9 @@ There are more static options for the MongoDB component configuration, all of
 them are described at components::Mongo.
 
 
-### Dynamic config
-
-We are not planning to get new dynamic config values in this sample. Because of
-that we just write the defaults to the fallback file of the
-`components::DynamicConfigFallbacks` component:
-@ref samples/mongo_service/dynamic_config_fallback.json
-
-All the values are described in a separate section
-@ref md_en_schemas_dynamic_configs .
-
-A production ready service would dynamically retrieve the above options at runtime from a configuration service. See
-@ref md_en_userver_tutorial_config_service for insights on how to change the
-above options on the fly, without restarting the service.
-
-
 ### int main()
 
-Finally, after writing down the dynamic config values into file at
-`dynamic-config-fallbacks.fallback-path`, we add our component to the
+Finally, we add our component to the
 components::MinimalServerComponentList(),
 and start the server with static configuration `kStaticConfig`.
 
@@ -103,13 +87,12 @@ make userver-samples-mongo_service
 
 The sample could be started by running
 `make start-userver-samples-mongo_service`. The command would invoke
-@ref md_en_userver_functional_testing "testsuite start target" that sets proper
+@ref scripts/docs/en/userver/functional_testing.md "testsuite start target" that sets proper
 paths in the configuration files, prepares and starts the DB, and starts the
 service.
 
 To start the service manually start the DB server and run
-`./samples/mongo_service/userver-samples-mongo_service -c </path/to/static_config.yaml>`
-(do not forget to prepare the configuration files!).
+`./samples/mongo_service/userver-samples-mongo_service -c </path/to/static_config.yaml>`.
 
 Now you can send a request to your service from another terminal:
 ```
@@ -131,39 +114,44 @@ $ curl -s http://localhost:8090/v1/translations?last_update=2021-11-01T12:00:00Z
 }
 ```
 
+### Unit tests
+@ref scripts/docs/en/userver/testing.md "Unit tests" for the service could be
+implemented with one of UTEST macros in the following way:
+
+@snippet samples/mongo_service/unittests/mongo_test.cpp  Unit test
+
 ### Functional testing
-@ref md_en_userver_functional_testing "Functional tests" for the service could be
+@ref scripts/docs/en/userver/functional_testing.md "Functional tests" for the service could be
 implemented using the testsuite. To do that you have to:
 
-* Provide Mongo settings info for the testsuite:
-@snippet samples/mongo_service/tests/conftest.py mongodb settings
-
-* Tell the testsuite to start the Mongo database:
-@snippet samples/mongo_service/tests/conftest.py require mongodb
+* Turn on the pytest_userver.plugins.mongo plugin and provide Mongo settings
+  info for the testsuite:
+  @snippet samples/mongo_service/testsuite/conftest.py mongodb settings
+  The pytest_userver.plugins.service_client.auto_client_deps() fixture
+  already known about the mongodb fixture, so there's no need to override the
+  extra_client_deps() fixture.
 
 * Write the test:
-@snippet samples/mongo_service/tests/test_mongo.py  Functional test
+  @snippet samples/mongo_service/testsuite/test_mongo.py  Functional test
 
 ## Full sources
 
 See the full example:
 * @ref samples/mongo_service/mongo_service.cpp
 * @ref samples/mongo_service/static_config.yaml
-* @ref samples/mongo_service/dynamic_config_fallback.json
 * @ref samples/mongo_service/CMakeLists.txt
-* @ref samples/mongo_service/tests/conftest.py
-* @ref samples/mongo_service/tests/test_mongo.py
+* @ref samples/mongo_service/testsuite/conftest.py
+* @ref samples/mongo_service/testsuite/test_mongo.py
 
 ----------
 
 @htmlonly <div class="bottom-nav"> @endhtmlonly
-⇦ @ref md_en_userver_tutorial_postgres_service | @ref md_en_userver_tutorial_redis_service ⇨
+⇦ @ref scripts/docs/en/userver/tutorial/postgres_service.md | @ref scripts/docs/en/userver/tutorial/redis_service.md ⇨
 @htmlonly </div> @endhtmlonly
 
 
 @example samples/mongo_service/mongo_service.cpp
 @example samples/mongo_service/static_config.yaml
-@example samples/mongo_service/dynamic_config_fallback.json
 @example samples/mongo_service/CMakeLists.txt
-@example samples/mongo_service/tests/conftest.py
-@example samples/mongo_service/tests/test_mongo.py
+@example samples/mongo_service/testsuite/conftest.py
+@example samples/mongo_service/testsuite/test_mongo.py

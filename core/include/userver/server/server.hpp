@@ -4,15 +4,19 @@
 
 #include <userver/components/component_context.hpp>
 #include <userver/engine/task/task_processor_fwd.hpp>
+#include <userver/server/congestion_control/limiter.hpp>
+#include <userver/server/congestion_control/sensor.hpp>
 #include <userver/server/handlers/fallback_handlers.hpp>
 #include <userver/server/handlers/http_handler_base.hpp>
+#include <userver/storages/secdist/component.hpp>
+#include <userver/utils/statistics/fwd.hpp>
 
 USERVER_NAMESPACE_BEGIN
 
 namespace server {
 
 namespace net {
-struct Stats;
+struct StatsAggregation;
 }
 
 namespace http {
@@ -24,41 +28,47 @@ class RequestsView;
 class ServerImpl;
 struct ServerConfig;
 
-class Server final {
- public:
-  Server(ServerConfig config,
-         const components::ComponentContext& component_context);
-  ~Server();
+class Server final : public congestion_control::Limitee, public congestion_control::RequestsSource {
+public:
+    Server(
+        ServerConfig config,
+        const storages::secdist::SecdistConfig& secdist,
+        const components::ComponentContext& component_context
+    );
+    ~Server() override;
 
-  const ServerConfig& GetConfig() const;
+    const ServerConfig& GetConfig() const;
 
-  formats::json::Value GetMonitorData(
-      const utils::statistics::StatisticsRequest&) const;
+    std::vector<std::string> GetCommonMiddlewares() const;
 
-  formats::json::Value GetTotalHandlerStatistics() const;
+    void WriteMonitorData(utils::statistics::Writer& writer) const;
 
-  net::Stats GetServerStats() const;
+    void WriteTotalHandlerStatistics(utils::statistics::Writer& writer) const;
 
-  void AddHandler(const handlers::HttpHandlerBase& handler,
-                  engine::TaskProcessor& task_processor);
+    net::StatsAggregation GetServerStats() const;
 
-  size_t GetRegisteredHandlersCount() const;
+    void AddHandler(const handlers::HttpHandlerBase& handler, engine::TaskProcessor& task_processor);
 
-  const http::HttpRequestHandler& GetHttpRequestHandler(
-      bool is_monitor = false) const;
+    size_t GetThrottlableHandlersCount() const;
 
-  void Start();
+    const http::HttpRequestHandler& GetHttpRequestHandler(bool is_monitor = false) const;
 
-  void Stop();
+    void Start();
 
-  RequestsView& GetRequestsView();
+    void Stop();
 
-  void SetRpsRatelimit(std::optional<size_t> rps);
+    RequestsView& GetRequestsView();
 
-  void SetRpsRatelimitStatusCode(http::HttpStatus status_code);
+    void SetLimit(std::optional<size_t> new_limit) override;
 
- private:
-  std::unique_ptr<ServerImpl> pimpl;
+    void SetRpsRatelimit(std::optional<size_t> rps);
+
+    void SetRpsRatelimitStatusCode(http::HttpStatus status_code);
+
+    std::uint64_t GetTotalRequests() const override;
+
+private:
+    std::unique_ptr<ServerImpl> pimpl;
 };
 
 }  // namespace server

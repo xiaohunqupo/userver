@@ -10,10 +10,10 @@ USERVER_NAMESPACE_BEGIN
 
 namespace utils::statistics {
 
-class BaseExposeFormatBuilder;
+class BaseFormatBuilder;
+class Request;
 
-void VisitMetrics(BaseExposeFormatBuilder& out,
-                  const formats::json::Value& statistics_storage_json);
+void VisitMetrics(BaseFormatBuilder& out, const formats::json::Value& statistics_storage_json, const Request& request);
 
 }  // namespace utils::statistics
 

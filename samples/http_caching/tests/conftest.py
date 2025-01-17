@@ -2,9 +2,9 @@ import pytest
 
 from testsuite import utils
 
-pytest_plugins = ['pytest_userver.plugins', 'pytest_userver.plugins.samples']
-
 # /// [patch configs]
+pytest_plugins = ['pytest_userver.plugins.core']
+
 USERVER_CONFIG_HOOKS = ['userver_config_translations']
 
 
@@ -12,9 +12,7 @@ USERVER_CONFIG_HOOKS = ['userver_config_translations']
 def userver_config_translations(mockserver_info):
     def do_patch(config_yaml, config_vars):
         components = config_yaml['components_manager']['components']
-        components['cache-http-translations'][
-            'translations-url'
-        ] = mockserver_info.url('v1/translations')
+        components['cache-http-translations']['translations-url'] = mockserver_info.url('v1/translations')
 
     return do_patch
     # /// [patch configs]
@@ -35,8 +33,8 @@ def mock_translations(mockserver, translations, mocked_time):
 
 
 # /// [translations]
-@pytest.fixture
-def translations():
+@pytest.fixture(name='translations')
+def _translations():
     return {
         'hello': {'en': 'hello', 'ru': 'Привет'},
         'welcome': {'ru': 'Добро пожаловать', 'en': 'Welcome'},

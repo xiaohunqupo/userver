@@ -19,37 +19,42 @@ namespace testsuite {
 /// @brief Dumper control interface for testsuite
 /// @details All methods are coro-safe.
 class DumpControl final {
- public:
-  void WriteCacheDumps(const std::vector<std::string>& dumper_names);
+public:
+    enum class PeriodicsMode { kDisabled, kEnabled };
 
-  void ReadCacheDumps(const std::vector<std::string>& dumper_names);
+    explicit DumpControl(PeriodicsMode periodics_mode);
 
- private:
-  friend class DumperRegistrationHolder;
+    PeriodicsMode GetPeriodicsMode() const;
 
-  void RegisterDumper(dump::Dumper& dumper);
+    void WriteCacheDumps(const std::vector<std::string>& dumper_names);
 
-  void UnregisterDumper(dump::Dumper& dumper);
+    void ReadCacheDumps(const std::vector<std::string>& dumper_names);
 
-  dump::Dumper& FindDumper(const std::string& name) const;
+private:
+    friend class DumperRegistrationHolder;
 
-  concurrent::Variable<
-      std::unordered_map<std::string, utils::NotNull<dump::Dumper*>>>
-      dumpers_;
+    void RegisterDumper(dump::Dumper& dumper);
+
+    void UnregisterDumper(dump::Dumper& dumper);
+
+    dump::Dumper& FindDumper(const std::string& name) const;
+
+    PeriodicsMode periodics_mode_;
+    concurrent::Variable<std::unordered_map<std::string, utils::NotNull<dump::Dumper*>>> dumpers_;
 };
 
 /// RAII helper for testsuite registration
 class DumperRegistrationHolder final {
- public:
-  DumperRegistrationHolder(DumpControl&, dump::Dumper&);
+public:
+    DumperRegistrationHolder(DumpControl&, dump::Dumper&);
 
-  DumperRegistrationHolder(DumperRegistrationHolder&&) = delete;
-  DumperRegistrationHolder& operator=(DumperRegistrationHolder&&) = delete;
-  ~DumperRegistrationHolder();
+    DumperRegistrationHolder(DumperRegistrationHolder&&) = delete;
+    DumperRegistrationHolder& operator=(DumperRegistrationHolder&&) = delete;
+    ~DumperRegistrationHolder();
 
- private:
-  DumpControl& control_;
-  dump::Dumper& dumper_;
+private:
+    DumpControl& control_;
+    dump::Dumper& dumper_;
 };
 
 }  // namespace testsuite

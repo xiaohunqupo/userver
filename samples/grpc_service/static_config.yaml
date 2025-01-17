@@ -9,19 +9,18 @@ components_manager:
                     file_path: '@stderr'
                     level: debug
                     overflow_behavior: discard
-        tracer:
-            service-name: grpc-service
-        dynamic-config:
-            fs-cache-path: ''
-        dynamic-config-fallbacks:
-            fallback-path: /etc/grpc_service/dynamic_config_fallback.json
 
-# /// [gRPC sample - static config client]
+# /// [static config client]
 # yaml
+        # Contains machinery common to all gRPC clients
+        grpc-client-common:
+            # The TaskProcessor for blocking connection initiation
+            blocking-task-processor: grpc-blocking-task-processor
+
         # Creates gRPC clients
         grpc-client-factory:
-            # The TaskProcessor for blocking connection initiation
-            task-processor: grpc-blocking-task-processor
+            # The list of gRPC client middleware components to use
+            middlewares: []
 
             # Optional channel parameters for gRPC Core
             # https://grpc.github.io/grpc/core/group__grpc__arg__keys.html
@@ -32,20 +31,29 @@ components_manager:
             # The service endpoint (URI). We talk to our own service,
             # which is kind of pointless, but works for an example
             endpoint: '[::1]:8091'
-# /// [gRPC sample - static config client]
+            client-name: greeter
+            dedicated-channel-counts:
+                SayHello: 3
+                SayHelloRequestStream: 2
+            factory-component: grpc-client-factory
 
-# /// [gRPC sample - static config server]
+# /// [static config client]
+
+# /// [static config server]
 # yaml
         # Common configuration for gRPC server
         grpc-server:
             # The single listening port for incoming RPCs
-            port: 8091
+            port: $grpc_server_port
+            port#fallback: 8091
+            completion-queue-count: 3
 
         # Our GreeterService implementation
         greeter-service:
             task-processor: main-task-processor
             greeting-prefix: Hello
-# /// [gRPC sample - static config server]
+            middlewares: []
+# /// [static config server]
 
         # In this example, the tests still communicate with the microservice
         # using HTTP, so we still need an HTTP server and an HTTP handler.
@@ -53,26 +61,23 @@ components_manager:
             listener:
                 port: 8092
                 task_processor: main-task-processor
-        auth-checker-settings:
         greeter-http-handler:
             path: /hello
             method: POST
             task_processor: main-task-processor
 
-    default_task_processor: main-task-processor
-# /// [gRPC sample - task processor]
+        testsuite-support:
+
+    default_task_processor: main-task-processor  # Task processor in which components start.
+
+# /// [task processor]
 # yaml
     task_processors:
         grpc-blocking-task-processor:  # For blocking gRPC channel creation
+            worker_threads: 2
             thread_name: grpc-worker
-            worker_threads: 2
-# /// [gRPC sample - task processor]
+# /// [task processor]
         main-task-processor:           # For non-blocking operations
-            thread_name: main-worker
-            worker_threads: 4
+            worker_threads: 8
         fs-task-processor:             # For blocking filesystem operations
-            thread_name: fs-worker
             worker_threads: 2
-    coro_pool:
-        initial_size: 500
-        max_size: 1000
